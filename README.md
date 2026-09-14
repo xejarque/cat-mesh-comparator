@@ -299,11 +299,27 @@ errores 0.25, ocupación 0.15). La web mostrará siempre los valores crudos junt
 
 ## Despliegue con Docker (recomendado)
 
+El repositorio es público, así que se clona sin credenciales de ningún tipo:
+
 ```bash
+git clone https://github.com/xejarque/cat-mesh-comparator.git /opt/cat-mesh-comparator
+cd /opt/cat-mesh-comparator
 cp .env.example .env      # rellenar broker y credenciales
+chmod 600 .env            # el .env lleva la contraseña del broker
 docker compose up -d      # collector + web + backup
 docker compose ps         # collector y web deben salir `healthy`
 ```
+
+Para actualizar más adelante:
+
+```bash
+cd /opt/cat-mesh-comparator && git pull && docker compose up -d --build
+```
+
+En una DietPi o similar, Docker está en su propio instalador (`dietpi-software` →
+Docker). Comprueba después que `docker compose version` responde: las instalaciones
+viejas traen el `docker-compose` de la v1, que no entiende el `name:` del fichero de
+compose.
 
 Levanta **tres servicios** desde una sola imagen:
 
