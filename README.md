@@ -348,6 +348,21 @@ interfaces, así que contesta en `http://<ip-del-host>:8000` — sea la de la LA
 la VPN — igual que cualquier otro servicio. Solo hace falta tocar `CATMESH_BIND` si
 quieres **restringirla** a una interfaz concreta.
 
+**Si el 8000 ya está ocupado**, cambia solo el puerto del anfitrión; el del contenedor
+no hace falta tocarlo:
+
+```bash
+# En .env
+CATMESH_PORT=8080
+```
+
+Para ver qué está libre antes de elegir:
+
+```bash
+ss -ltn            # puertos escuchando
+docker ps          # puertos publicados por otros contenedores
+```
+
 ### Publicarlo de verdad (TLS)
 
 Solo funciona si la máquina es **alcanzable desde internet por los puertos 80 y 443**
