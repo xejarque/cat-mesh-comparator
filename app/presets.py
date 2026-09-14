@@ -2,39 +2,47 @@ from __future__ import annotations
 
 from app.models import PresetKey
 
-# Etiquetas para presets conocidos. Los presets se descubren solos desde los datos
-# (cualquier tupla nueva en un /status crea su fila); esto solo pone nombre a los
+# Nombres de los presets conocidos. Los presets se descubren solos desde los datos
+# (cualquier tupla nueva en un /status crea su fila); esto solo pone **alias** a los
 # que ya hemos identificado.
+#
+# Aquí va solo el nombre, nunca los parámetros: los añade `preset_label` desde la
+# tupla. Antes se escribían a mano y unos llevaban SF/CR y otros no, así que dos
+# filas de la misma tabla se leían con criterios distintos y no se podían comparar.
 #
 # Los cuatro slots de h1.4 van con los parámetros que usa de verdad la red de
 # Cataluña — BW 62.5 kHz, SF7, CR 4/6 — observados en el broker el 2026-09-14.
 # No son los SF11/CR5 que se ven en otras redes europeas.
 SEED_PRESETS: dict[PresetKey, str] = {
-    PresetKey(869.432, 62.5, 7, 6): "Slot 1 (869.431)",
+    PresetKey(869.432, 62.5, 7, 6): "Slot 1",
     PresetKey(869.493, 62.5, 7, 6): "Slot 2",
     PresetKey(869.556, 62.5, 7, 6): "Slot 3",
-    PresetKey(869.618, 62.5, 7, 6): "Slot 4 (869.619)",
-    PresetKey(869.618, 62.5, 8, 8): "Slot 4 · SF8/CR8",
-    PresetKey(869.618, 62.5, 7, 8): "Slot 4 · SF7/CR8",
+    PresetKey(869.618, 62.5, 7, 6): "Slot 4",
+    PresetKey(869.618, 62.5, 8, 8): "Slot 4",
+    PresetKey(869.618, 62.5, 7, 8): "Slot 4",
     PresetKey(869.450, 62.5, 7, 6): "Propuesto · guarda inferior",
     PresetKey(869.600, 62.5, 7, 6): "Propuesto · guarda superior",
-    PresetKey(869.525, 250.0, 11, 5): "LongFast (Meshtastic)",
+    PresetKey(869.525, 250.0, 11, 5): "LongFast",
 }
 
-DEFAULT_PRESET_LABELS = {
-    "slot1": "Slot 1",
-    "slot2": "Slot 2",
-    "slot3": "Slot 3",
-    "slot4": "Slot 4",
-}
+
+def preset_parameters(preset: PresetKey) -> str:
+    """La tupla técnica, siempre completa y siempre en el mismo orden."""
+    return (
+        f"{preset.freq_mhz:g} MHz · BW{preset.bw_khz:g} · SF{preset.sf} · CR4/{preset.cr}"
+    )
 
 
 def preset_label(preset: PresetKey) -> str:
-    """Etiqueta de un preset: la sembrada si la conocemos, si no la tupla en crudo."""
-    seeded = SEED_PRESETS.get(preset)
-    if seeded:
-        return seeded
-    return f"{preset.freq_mhz:g} MHz · BW{preset.bw_khz:g} · SF{preset.sf} · CR4/{preset.cr}"
+    """Nombre del preset, si lo tiene, seguido **siempre** de sus parámetros.
+
+    La etiqueta tiene que describirse sola: sin frecuencia y sin SF/CR no se puede
+    comparar nada leyendo. En 869.618 conviven tres configuraciones distintas, así
+    que el nombre por sí solo no basta para distinguirlas.
+    """
+    name = SEED_PRESETS.get(preset)
+    parameters = preset_parameters(preset)
+    return f"{name} · {parameters}" if name else parameters
 
 
 def preset_slug(preset: PresetKey) -> str:

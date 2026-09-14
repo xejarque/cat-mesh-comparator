@@ -91,6 +91,23 @@ def init_db(conn: sqlite3.Connection) -> None:
     with transaction(conn):
         for preset in SEED_PRESETS:
             ensure_preset(conn, preset)
+        _refresh_seed_labels(conn)
+
+
+def _refresh_seed_labels(conn: sqlite3.Connection) -> None:
+    """Vuelve a poner al día las etiquetas de los presets conocidos.
+
+    Se guardan desnormalizadas para que la base se explique sola al abrirla con
+    sqlite3, pero la web siempre las recalcula con `preset_label`. Si cambia el
+    formato de la etiqueta, las filas que ya existían se quedarían con el texto
+    antiguo — que es exactamente lo que pasó cuando la etiqueta pasó a llevar
+    siempre los parámetros. Se hace aquí, una vez al arrancar, y no en cada paquete.
+    """
+    for preset in SEED_PRESETS:
+        conn.execute(
+            "UPDATE presets SET label = ? WHERE preset_id = ? AND label IS NOT ?",
+            (preset_label(preset), preset.db_id, preset_label(preset)),
+        )
 
 
 def _migrate(conn: sqlite3.Connection) -> None:

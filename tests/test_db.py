@@ -5,7 +5,7 @@ import pytest
 from app.db import connect, ensure_preset, init_db, insert_packets, insert_status
 from app.db import SCHEMA_VERSION, prune_raw_packets
 from app.models import PresetKey
-from app.presets import SEED_PRESETS
+from app.presets import SEED_PRESETS, preset_label
 from tests.helpers import attribute, epoch, mk_packet, mk_status
 
 SLOT1 = PresetKey(869.431, 62.5, 11, 5)
@@ -29,7 +29,42 @@ def test_init_db_seeds_the_known_presets(conn):
     slot4 = conn.execute(
         "SELECT label FROM presets WHERE freq_mhz = 869.618 AND sf = 7 AND cr = 6"
     ).fetchone()
-    assert slot4["label"] == "Slot 4 (869.619)"
+    assert slot4["label"] == "Slot 4 · 869.618 MHz · BW62.5 · SF7 · CR4/6"
+
+
+def test_preset_label_always_carries_the_parameters():
+    """La etiqueta tiene que describirse sola.
+
+    Regresión: los alias se escribían a mano y unos llevaban SF/CR y otros no, así
+    que dos filas de la misma tabla se leían con criterios distintos y no se podían
+    comparar. En 869.618 conviven tres configuraciones, y el nombre no las distingue.
+    """
+    for preset in SEED_PRESETS:
+        assert preset_label(preset) == (
+            f"{SEED_PRESETS[preset]} · {preset.freq_mhz:g} MHz"
+            f" · BW{preset.bw_khz:g} · SF{preset.sf} · CR4/{preset.cr}"
+        )
+
+
+def test_a_new_preset_without_alias_is_labelled_with_its_parameters(conn):
+    preset = PresetKey(869.700, 125.0, 9, 8)
+    assert preset_label(preset) == "869.7 MHz · BW125 · SF9 · CR4/8"
+
+
+def test_stale_labels_are_refreshed_on_startup(tmp_path):
+    """Las etiquetas viejas se ponen al día al arrancar, no se quedan para siempre."""
+    path = tmp_path / "stale.db"
+    connection = connect(path)
+    init_db(connection)
+    connection.execute("UPDATE presets SET label = 'texto viejo'")
+    connection.commit()
+    connection.close()
+
+    connection = connect(path)
+    init_db(connection)
+    labels = {row["label"] for row in connection.execute("SELECT label FROM presets")}
+    connection.close()
+    assert "texto viejo" not in labels
 
 
 def test_init_db_is_idempotent(tmp_path):
