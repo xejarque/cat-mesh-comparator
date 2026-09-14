@@ -136,9 +136,11 @@ def test_slot_is_only_set_when_the_grouping_identifies_a_frequency(conn):
     assert por_sf[0].slot is None
 
 
-def test_slot_index_matches_only_the_narrow_slots():
+def test_slot_index_matches_only_the_frequencies_of_a_plan():
     assert slot_index(869.432) == 1
     assert slot_index(869.618) == 4
+    # El slot es esa frecuencia **con el ancho del plan**; en 250 kHz es otra cosa.
+    assert slot_index(869.618, 250.0) is None
     # 869.525 es el canal público de Meshtastic: no es uno de los cuatro slots.
     assert slot_index(869.525) is None
     assert slot_index(None) is None

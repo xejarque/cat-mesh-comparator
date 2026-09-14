@@ -128,7 +128,7 @@ sigue ingiriendo, y un `raw` ilegible se cuenta pero el paquete se guarda igual.
 app/
   models.py         dataclasses del dominio (Packet, Status, PresetKey, Attribution)
   config.py         settings desde entorno / .env
-  presets.py        presets conocidos, canal físico y numeración de slots
+  presets.py        planes de canales, canal físico y numeración de slots
   db.py             conexión SQLite, esquema y migraciones, escrituras
   decode.py         enriquecimiento con meshcoredecoder (nunca lanza)   (puro)
   attribution.py    línea de tiempo observer→preset y resolución        (puro)

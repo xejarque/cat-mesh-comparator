@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from app import presets
 from app.db import connect, ensure_preset, init_db, insert_packets, insert_status
 from app.db import SCHEMA_VERSION, prune_raw_packets
 from app.models import PresetKey
@@ -63,6 +64,25 @@ def test_slot_name_comes_from_the_frequency_not_from_a_list():
 def test_a_wide_preset_on_a_slot_frequency_is_not_a_slot():
     # El slot es esa frecuencia **con BW 62.5**; en 250 kHz es otra cosa.
     assert preset_name(PresetKey(869.618, 250.0, 11, 5)) is None
+
+
+def test_a_new_channel_plan_needs_only_data(monkeypatch):
+    """Un plan futuro (tres slots con guarda de banda) se estrena añadiendo una entrada
+    a ``CHANNEL_PLANS``, sin tocar el nombrado ni el número de slots.
+
+    Regresión: el plan era una lista fija de cuatro frecuencias de h1.4, así que
+    cualquier otro plan se quedaba sin nombre.
+    """
+    monkeypatch.setattr(
+        presets,
+        "CHANNEL_PLANS",
+        (presets.ChannelPlan(125.0, (868.100, 868.300, 868.500)),),
+    )
+
+    assert preset_name(PresetKey(868.300, 125.0, 9, 5)) == "Slot 2"
+    assert preset_name(PresetKey(868.500, 125.0, 10, 8)) == "Slot 3"
+    # La misma frecuencia con otro ancho no pertenece a este plan.
+    assert preset_name(PresetKey(868.500, 62.5, 7, 6)) is None
 
 
 def test_non_slot_presets_use_their_alias():

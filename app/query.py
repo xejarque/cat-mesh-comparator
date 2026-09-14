@@ -53,7 +53,7 @@ class ReceiverStats:
 class ChannelSummary:
     key: tuple[float, ...]
     label: str
-    # Slot 1..4 cuando el agrupamiento identifica una frecuencia; si no, ``None``.
+    # Slot 1..N cuando el agrupamiento identifica una frecuencia; si no, ``None``.
     slot: int | None
     pkts: int
     transmissions: int

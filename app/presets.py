@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from app.models import PresetKey
 
 # Presets que se crean al arrancar aunque nadie los use todavía, para que la página de
@@ -14,11 +16,11 @@ SEED_PRESETS: tuple[PresetKey, ...] = (
     PresetKey(869.525, 250.0, 11, 5),
 )
 
-# Nombre para los presets que **no** son uno de los cuatro slots.
+# Nombre para los presets que **no** son un slot de ningún plan de canales.
 #
-# El nombre de un slot lo determina su frecuencia, no esta lista: si no, cualquier
-# combinación nueva de SF/CR sobre 869.618 se quedaría sin nombre, que es justo lo que
-# pasaba con SF10. Aquí van solo los que no son slots.
+# El nombre de un slot lo determina su plan, no esta lista: si no, cualquier
+# combinación nueva de SF/CR sobre una frecuencia del plan se quedaría sin nombre, que
+# es justo lo que pasaba con SF10. Aquí van solo los que no son slots.
 PRESET_ALIASES: dict[PresetKey, str] = {
     PresetKey(869.450, 62.5, 7, 6): "Propuesto · guarda inferior",
     PresetKey(869.600, 62.5, 7, 6): "Propuesto · guarda superior",
@@ -36,14 +38,15 @@ def preset_parameters(preset: PresetKey) -> str:
 def preset_name(preset: PresetKey) -> str | None:
     """Nombre del preset, si tiene uno.
 
-    Los cuatro slots de h1.4 se nombran por su **frecuencia**: cualquier combinación
-    de SF y CR sobre 869.618 es el slot 4, aunque nadie la haya catalogado antes. Es
-    lo que hace que un preset recién descubierto no aparezca distinto de los demás.
+    El nombre de un slot sale de su **plan de canales**: cualquier combinación de SF y
+    CR sobre una de sus frecuencias es ese slot, aunque nadie la haya catalogado antes.
+    Es lo que hace que un preset recién descubierto no aparezca distinto de los demás, y
+    lo que permite estrenar un plan nuevo —tres slots con guarda de banda, por ejemplo—
+    sin tocar esta función.
     """
-    if abs(preset.bw_khz - 62.5) < 0.01:
-        index = slot_index(preset.freq_mhz)
-        if index is not None:
-            return f"Slot {index}"
+    index = slot_index(preset.freq_mhz, preset.bw_khz)
+    if index is not None:
+        return f"Slot {index}"
     return PRESET_ALIASES.get(preset)
 
 
@@ -104,21 +107,42 @@ def channel_label(
     return " · ".join(parts)
 
 
-def is_narrow_slot(preset: PresetKey) -> bool:
-    """Los cuatro slots estrechos de h1.4 con BW 62.5 kHz."""
-    return abs(preset.bw_khz - 62.5) < 0.01 and 869.4 <= preset.freq_mhz <= 869.65
+@dataclass(frozen=True, slots=True)
+class ChannelPlan:
+    """Un plan de canales: un ancho de banda y sus frecuencias, en orden.
+
+    El número de un slot es su posición en ``centres_mhz``, empezando en 1, así que un
+    plan de otro tamaño —los tres slots con guarda de banda que se quieren probar— se
+    soporta añadiendo una entrada a :data:`CHANNEL_PLANS`, no tocando el nombrado.
+    """
+
+    bw_khz: float
+    centres_mhz: tuple[float, ...]
 
 
-# Centros nominales de los cuatro slots estrechos, en el orden en que los numera
-# la comunidad. El color de la web sale de aquí, nunca del índice de la fila.
-NARROW_SLOTS_MHZ = (869.432, 869.493, 869.556, 869.618)
+# Planes conocidos. Los cuatro slots estrechos de h1.4, en el orden en que los numera
+# la comunidad: el color de la web sale de aquí, nunca del índice de la fila.
+CHANNEL_PLANS: tuple[ChannelPlan, ...] = (
+    ChannelPlan(62.5, (869.432, 869.493, 869.556, 869.618)),
+)
+
+# El nominal del plan y la frecuencia medida no cuadran al último dígito (869.431
+# contra 869.432), así que la comparación lleva tolerancia.
+PLAN_TOLERANCE_MHZ = 0.01
 
 
-def slot_index(freq_mhz: float | None, tolerance: float = 0.01) -> int | None:
-    """1..4 si la frecuencia es uno de los slots estrechos; ``None`` si no."""
+def slot_index(freq_mhz: float | None, bw_khz: float | None = None) -> int | None:
+    """``1..N`` si la frecuencia es un slot de algún plan; ``None`` si no.
+
+    Sin ``bw_khz`` se busca en todos los planes: es lo que necesita el color de una fila
+    agrupada solo por frecuencia. Con él, solo en los planes de ese ancho.
+    """
     if freq_mhz is None:
         return None
-    for index, centre in enumerate(NARROW_SLOTS_MHZ, start=1):
-        if abs(freq_mhz - centre) <= tolerance:
-            return index
+    for plan in CHANNEL_PLANS:
+        if bw_khz is not None and abs(plan.bw_khz - bw_khz) > PLAN_TOLERANCE_MHZ:
+            continue
+        for index, centre in enumerate(plan.centres_mhz, start=1):
+            if abs(freq_mhz - centre) <= PLAN_TOLERANCE_MHZ:
+                return index
     return None
