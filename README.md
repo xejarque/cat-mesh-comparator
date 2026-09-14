@@ -300,18 +300,17 @@ errores 0.25, ocupación 0.15). La web mostrará siempre los valores crudos junt
 ## Despliegue con Docker (recomendado)
 
 ```bash
-cp .env.example .env      # rellenar broker, credenciales y CATMESH_SITE
-docker compose up -d      # collector + web + caddy + backup
-docker compose ps         # los dos primeros deben salir `healthy`
+cp .env.example .env      # rellenar broker y credenciales
+docker compose up -d      # collector + web + backup
+docker compose ps         # collector y web deben salir `healthy`
 ```
 
-Levanta **cuatro servicios** desde una sola imagen:
+Levanta **tres servicios** desde una sola imagen:
 
 | Servicio | Qué hace |
 | -------- | -------- |
 | `collector` | Escucha el broker, escribe en SQLite y corre el rollup periódico |
-| `web` | Uvicorn en `127.0.0.1:8000`, solo accesible desde la máquina |
-| `caddy` | TLS automático. Es el único que escucha en internet (80/443) |
+| `web` | Uvicorn en `127.0.0.1:8000` (configurable, ver abajo) |
 | `backup` | Copia diaria con `sqlite3 .backup`, que es seguro en caliente |
 
 **Ojo con el volumen de SQLite.** El colector y la web son **dos contenedores**
@@ -320,8 +319,43 @@ leyendo y escribiendo el mismo fichero. Funciona porque va en un volumen con nom
 memoria compartida POSIX de verdad, que es lo que necesita el modo WAL. **No lo
 cambies por un bind mount** a una carpeta del anfitrión sin probarlo antes.
 
-Sin dominio todavía, deja `CATMESH_SITE=localhost`: Caddy usa su propia autoridad y
-sirve para probar.
+### Si accedes por VPN
+
+Es el caso de un servidor doméstico al que no le llega internet directamente. **No uses
+Caddy**: no puede obtener certificado de Let's Encrypt porque la máquina no es
+alcanzable para el desafío, y no hace falta, porque la VPN ya cifra el tránsito de
+punta a punta. Añadir TLS solo serviría para ver un aviso del navegador si no instalas
+la autoridad de Caddy en cada dispositivo.
+
+Lo que sí hay que hacer es **escuchar en la interfaz de la VPN**, que por defecto no se
+hace (la web nace en `127.0.0.1`, que es lo prudente):
+
+```bash
+# En .env
+CATMESH_BIND=100.x.y.z    # la dirección que te da la VPN
+```
+
+Y se accede con `http://100.x.y.z:8000`. Con `CATMESH_BIND=0.0.0.0` escucha también en
+la red local.
+
+### Publicarlo de verdad (TLS)
+
+Solo funciona si la máquina es **alcanzable desde internet por los puertos 80 y 443**
+(IP pública con redirección, o un túnel). Entonces:
+
+```bash
+# En .env
+CATMESH_SITE=observatorio.tudominio.cat
+
+docker compose --profile tls up -d
+```
+
+Caddy saca y renueva el certificado solo. El `Caddyfile` es el mismo en todos los
+casos: está parametrizado con `CATMESH_SITE` y `CATMESH_UPSTREAM`.
+
+> **Trampa de los perfiles:** un `docker compose down` normal **no** para Caddy, porque
+> los servicios con perfil quedan fuera de su vista. Hay que pararlo con el mismo
+> perfil: `docker compose --profile tls down`.
 
 ### Llevarse el historial acumulado
 

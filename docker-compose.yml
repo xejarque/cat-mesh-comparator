@@ -35,9 +35,10 @@ services:
       CATMESH_DB: /data/catmesh.db
     volumes:
       - catmesh-data:/data
-    # Solo en localhost: quien atiende al público es Caddy, no esto.
+    # Por defecto solo escucha en localhost, que es lo prudente. Si accedes por VPN,
+    # pon CATMESH_BIND a la dirección de la VPN (o a 0.0.0.0 si te da igual la LAN).
     ports:
-      - "127.0.0.1:8000:8000"
+      - "${CATMESH_BIND:-127.0.0.1}:${CATMESH_PORT:-8000}:8000"
     depends_on:
       collector:
         condition: service_started
@@ -66,8 +67,13 @@ services:
       - ./backups:/backups
     restart: unless-stopped
 
-  # TLS automático. Es el único que escucha en internet.
+  # TLS automático, para cuando el sitio se publique de verdad. **No arranca por
+  # defecto**: si accedes por VPN no puede obtener certificado (la máquina no es
+  # alcanzable desde internet) y la propia VPN ya cifra el tránsito.
+  #
+  #   docker compose --profile tls up -d
   caddy:
+    profiles: ["tls"]
     image: caddy:2-alpine
     environment:
       CATMESH_SITE: ${CATMESH_SITE:-localhost}
