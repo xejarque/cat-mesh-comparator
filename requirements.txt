@@ -1,0 +1,9 @@
+fastapi>=0.115
+uvicorn[standard]>=0.32
+jinja2>=3.1
+aiomqtt>=2.3
+python-dotenv>=1.0
+markdown-it-py>=3.0
+# Decodificador de paquetes MeshCore. Es independiente del radio: solo arrastra
+# pycryptodome/cryptography, nada de Bluetooth ni serial.
+meshcoredecoder>=0.3.2

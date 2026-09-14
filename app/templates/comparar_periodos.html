@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}Comparar por períodos · Observatorio MeshCore 868{% endblock %}
+
+{% block content %}
+<h1>Comparar canales por períodos</h1>
+{% include "_comparar_tabs.html" %}
+
+<div class="note warn">
+  <p>
+    <strong>Aquí el efecto del tiempo juega en contra.</strong> Comparar una semana con
+    otra elimina la confusión por geografía y equipo, pero introduce la propagación,
+    la meteorología y cuánta gente estaba activa. Una diferencia entre dos semanas
+    puede no tener nada que ver con el canal.
+  </p>
+  <p>
+    Por eso lo que convierte esto en una conclusión es el <strong>control</strong>: otro
+    período en el <em>mismo</em> canal que A. Si entre dos períodos del mismo canal ya
+    hay una diferencia, una diferencia parecida entre canales no demuestra nada.
+  </p>
+</div>
+
+{% if not comparison %}
+<div class="empty-state">
+  {% if not regimes %}
+    <strong>No se ha detectado ningún período</strong>
+    Hacen falta al menos {{ min_regime_minutes }} minutos seguidos con un canal
+    dominante claro para que un tramo cuente como período. O no hay datos suficientes
+    todavía, o la red ha estado migrando y ningún canal llegó a dominar.
+  {% elif regimes | length == 1 %}
+    <strong>Solo hay un período, así que no hay nada que comparar</strong>
+    La red ha estado todo el tiempo en <strong>{{ regimes[0].channel_label }}</strong>
+    ({{ regimes[0].minutes }} minutos). Para comparar hacen falta al menos dos períodos
+    en canales distintos — es decir, una campaña de verdad:
+    <a href="/campana">cómo organizarla</a>.
+  {% else %}
+    <strong>No se pueden comparar esos dos períodos</strong>
+    Prueba a elegir otros dos en el selector.
+  {% endif %}
+</div>
+{% endif %}
+
+{% if comparison %}
+<p class="stamp">Datos hasta {{ generated_at | ts }}</p>
+
+<form class="controls" method="get" action="/comparar">
+  <input type="hidden" name="mode" value="periodos">
+  <label class="field">
+    <span>Período A</span>
+    <select name="a">
+      {% for regime in regimes %}
+      <option value="{{ regime.starts_at }}"
+              {% if period_a and regime.starts_at == period_a.starts_at %}selected{% endif %}>
+        {{ regime.channel_label }} · desde {{ regime.starts_at | ts }}
+      </option>
+      {% endfor %}
+    </select>
+  </label>
+  <label class="field">
+    <span>Período B</span>
+    <select name="b">
+      {% for regime in regimes %}
+      <option value="{{ regime.starts_at }}"
+              {% if period_b and regime.starts_at == period_b.starts_at %}selected{% endif %}>
+        {{ regime.channel_label }} · desde {{ regime.starts_at | ts }}
+      </option>
+      {% endfor %}
+    </select>
+  </label>
+  <button class="btn" type="submit">Comparar</button>
+</form>
+
+{% if not period_a.clean or not period_b.clean %}
+<div class="note warn">
+  <p>
+    <strong>Alguno de los dos períodos no fue un régimen limpio.</strong> Fracción de
+    receptores en el canal dominante: {{ (period_a.dominant_share * 100) | round(0) }} %
+    y {{ (period_b.dominant_share * 100) | round(0) }} %. Por debajo del 80 % la red
+    estaba a medio migrar, y eso difumina la comparación.
+  </p>
+</div>
+{% endif %}
+
+<h2>Resumen por métrica</h2>
+{% if comparison.has_control %}
+<p class="stamp">
+  Control: <strong>{{ comparison.control_label }}</strong>, el mismo canal que A en
+  otro momento. Las dos diferencias se calculan sobre los mismos sujetos.
+</p>
+{% else %}
+<div class="note warn">
+  <p>
+    <strong>Sin control.</strong> No hay ningún otro período en el mismo canal que A,
+    así que <strong>no se puede saber cuánta diferencia es simple paso del tiempo</strong>.
+    Los números de abajo son sugerentes, pero no concluyentes. Un diseño A-B-A (volver
+    al canal de partida) daría ese control.
+  </p>
+</div>
+{% endif %}
+
+<div class="table-scroll">
+  <table>
+    <thead>
+      <tr>
+        <th>Métrica</th>
+        <th>Sujetos</th>
+        <th>Diferencia A → B</th>
+        {% if comparison.has_control %}<th>Diferencia A → control</th>{% endif %}
+        {% if comparison.has_control %}<th>¿Supera el ruido temporal?</th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in comparison.metrics %}
+      <tr>
+        <td class="strong">{{ item.metric }}</td>
+        <td>{{ item.subjects | num }}</td>
+        <td>{{ item.median_delta | metric(item.unit) }}</td>
+        {% if comparison.has_control %}
+        <td>{{ item.median_control_delta | metric(item.unit) }}</td>
+        <td>
+          {% if item.signal %}
+            <strong>sí</strong>
+          {% elif item.signal is none %}
+            <span class="muted">—</span>
+          {% else %}
+            <span class="muted">no</span>
+          {% endif %}
+        </td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<h2>Cobertura</h2>
+<p>
+  <strong>{{ comparison.comparable_subjects }}</strong> sujetos aparecen en los dos
+  períodos y son los únicos que se comparan. Los que solo están en uno llegaron o se
+  fueron, y meterlos mezclaría el efecto canal con el de quién estaba escuchando.
+</p>
+{% if comparison.excluded %}
+<ul class="prose">
+  {% for item in comparison.excluded %}
+  <li>{{ item.subject }} — <span class="muted">{{ item.reason }}</span></li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+{% for subject, deltas in comparison.deltas | groupby("subject") %}
+<section class="paired">
+  <h3>{{ subject }}</h3>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Métrica</th>
+          <th>A · {{ comparison.a_label }}</th>
+          <th>B · {{ comparison.b_label }}</th>
+          {% if comparison.has_control %}<th>Control</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for delta in deltas %}
+        <tr>
+          <td>{{ delta.metric }}</td>
+          <td class="strong">{{ delta.a.value | metric(delta.unit) }}</td>
+          <td class="strong">{{ delta.b.value | metric(delta.unit) }}</td>
+          {% if comparison.has_control %}
+          <td class="muted">
+            {{ delta.control.value | metric(delta.unit) if delta.control else "—" }}
+          </td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endfor %}
+{% endif %}
+{% endblock %}

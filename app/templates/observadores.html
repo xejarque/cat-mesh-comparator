@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Observadores · Observatorio MeshCore 868{% endblock %}
+
+{% block content %}
+<h1>Observadores</h1>
+<p class="lede">
+  Cada receptor que publica en el broker. Lo que se compara entre canales son
+  <em>distribuciones</em> de lo que estos nodos oyen, así que saber quién escucha y
+  con qué configuración es parte del dato, no un anexo.
+</p>
+
+{% if observers %}
+<div class="table-scroll">
+  <table>
+    <thead>
+      <tr>
+        <th>Observador</th>
+        <th>Zona</th>
+        <th>Hardware</th>
+        <th>Configuración</th>
+        <th>CR</th>
+        <th>Ruido de fondo</th>
+        <th>Ocupación</th>
+        <th>Errores/h</th>
+        <th>Recepciones</th>
+        <th>Última vez</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in observers %}
+      <tr>
+        <td class="strong">{{ row.name or row.short }}</td>
+        <td>{{ row.iata or "—" }}</td>
+        <td class="muted">{{ row.model or "—" }}</td>
+        <td>{{ row.preset_label or "—" }}</td>
+        <td>{{ row.cr or "—" }}</td>
+        <td>{{ row.noise_floor | db }}</td>
+        <td>{{ row.chan_util_pct | pct }}</td>
+        <td>{{ row.err_per_h | db1 }}</td>
+        <td>{{ row.pkts_rx | num }}</td>
+        <td class="muted">{{ row.last_seen | ago }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="note">
+  <p>
+    <strong>Sin mapa, de momento.</strong> El broker no publica la posición de los
+    observadores: el decoder sí puede extraerla de los <em>adverts</em>, pero eso
+    todavía no se está guardando. Preferimos no dibujar un mapa con posiciones
+    inventadas.
+  </p>
+</div>
+
+<p class="stamp">
+  Un observador que solo aparece con un aviso <code>offline</code> no tiene preset
+  utilizable, y sus paquetes no se pueden atribuir. Se ve en
+  <a href="/calidad">Calidad</a>.
+</p>
+{% else %}
+<div class="empty-state">
+  <strong>Ningún observador todavía</strong>
+  El recolector aún no ha recibido ningún <code>/status</code>. Hasta que llegue uno,
+  no hay nada que atribuir.
+</div>
+{% endif %}
+{% endblock %}

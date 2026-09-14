@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}Comparar · Observatorio MeshCore 868{% endblock %}
+
+{% macro subject_block(subject) %}
+<section class="paired">
+  <h3>
+    {{ subject.subject }}
+    {% if subject.subtitle %}<span class="muted">· {{ subject.subtitle }}</span>{% endif %}
+    {% if subject.distance_km is not none %}
+    <span class="muted">· {{ subject.distance_km | round(1) }} km</span>
+    {% endif %}
+  </h3>
+  <p class="stamp">
+    {% if subject.only_sf_changes %}
+      <span class="flag-warn">Misma frecuencia, solo cambia el SF</span> · un receptor
+      SF7 no puede oír una transmisión SF8, así que cada uno ve a un conjunto distinto
+      de emisores: esto describe poblaciones distintas, no el mismo enlace
+    {% elif subject.comparable %}
+      Se solapan {{ subject.overlap_seconds // 60 }} min · comparación válida
+    {% else %}
+      <span class="flag-warn">Sin solapamiento temporal</span> · la diferencia entre
+      canales podría ser propagación, no canal
+    {% endif %}
+  </p>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Métrica</th>
+          {% for m in subject.measurements %}<th>{{ m.channel_label }}</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="muted">Medido entre</td>
+          {% for m in subject.measurements %}
+          <td class="muted">{{ m.first_ts | ts }} – {{ m.last_ts | ts }}</td>
+          {% endfor %}
+        </tr>
+        {% for i in range(subject.measurements[0].metrics | length) %}
+        <tr>
+          <td>{{ subject.measurements[0].metrics[i].label }}</td>
+          {% for m in subject.measurements %}
+          <td class="strong">{{ m.metrics[i].value | metric(m.metrics[i].unit) }}</td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endmacro %}
+
+{% block content %}
+<h1>Comparar canales de verdad</h1>
+{% include "_comparar_tabs.html" %}
+
+<div class="note">
+  <p>
+    <strong>El comparador normal compara canales medidos por receptores distintos.</strong>
+    Eso mezcla geografía, antena, hardware y momento: si dos canales salen diferentes,
+    no se sabe qué lo causó. Aquí solo aparecen sujetos que han estado en
+    <strong>más de un canal</strong> — el mismo receptor, la misma pareja o la misma
+    comarca. Es la única forma de poder decir «esto es por el canal».
+  </p>
+  <p>
+    Y una regla dura: <strong>si las medidas no se solapan en el tiempo, no se
+    comparan.</strong> Dos días distintos pueden diferir por propagación, no por canal.
+  </p>
+</div>
+
+<form class="controls" method="get" action="/comparar">
+  <label class="field">
+    <span>Ventana</span>
+    <select name="window">
+      {% for option in windows %}
+      <option value="{{ option }}"{% if option == window %} selected{% endif %}>{{ option }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <button class="btn" type="submit">Aplicar</button>
+  <p class="stamp" style="margin:0;">Datos hasta {{ generated_at | ts }}</p>
+</form>
+
+{% set comparables = (observers + pairs + regions) | selectattr("comparable") | list %}
+
+{% if not comparables %}
+<div class="empty-state">
+  <strong>Hoy no hay nada que comparar</strong>
+  Ningún receptor, pareja ni comarca ha estado en más de un canal en esta ventana.
+  Y es lógico: ahora mismo <strong>todo el mundo escucha en 869.618</strong>.
+  <p style="margin-top:12px;">
+    Lo que hace falta es mucho más barato de lo que parece: <strong>no</strong> hacen
+    falta muchos receptores por canal, basta con <strong>uno que vaya alternando</strong>.
+    Un receptor que pase 24 h en 869.618 y 24 h en 869.450 aporta una comparación
+    limpia de ruido, errores y alcance, porque mantiene antena, ubicación y hardware.
+    Con veinte receptores repartidos por canales distintos no se consigue eso.
+  </p>
+  <p style="margin-top:12px;">
+    <a href="/campana">Ver qué canales no cubre nadie →</a>
+  </p>
+</div>
+{% endif %}
+
+{% if observers %}
+<h2>Por receptor</h2>
+<p class="stamp">
+  La comparación más limpia que existe: mismo equipo, misma antena, misma ubicación.
+</p>
+{% for subject in observers %}{{ subject_block(subject) }}{% endfor %}
+{% endif %}
+
+{% if pairs %}
+<h2>Por pareja</h2>
+<p class="stamp">
+  Mismo enlace entre dos receptores, medido en cada canal. El PDR sí es comparable
+  directamente.
+</p>
+{% for subject in pairs %}{{ subject_block(subject) }}{% endfor %}
+{% endif %}
+
+{% if regions %}
+<h2>Por comarca</h2>
+<div class="note warn">
+  <p>
+    La más débil de las tres. Comparte la geografía, pero <strong>no</strong> los
+    receptores: siguen cambiando el equipo y la antena. Sirve para descartar, no para
+    concluir.
+  </p>
+</div>
+{% for subject in regions %}{{ subject_block(subject) }}{% endfor %}
+{% endif %}
+{% endblock %}

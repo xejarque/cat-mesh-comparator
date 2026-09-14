@@ -1,0 +1,13 @@
+[Unit]
+Description=Copia de seguridad diaria de cat-mesh-comparator
+After=cat-mesh-collector.service
+
+[Service]
+Type=oneshot
+User=catmesh
+Group=catmesh
+EnvironmentFile=/opt/cat-mesh-comparator/.env
+ExecStart=/opt/cat-mesh-comparator/deploy/backup.sh
+
+[Install]
+WantedBy=multi-user.target

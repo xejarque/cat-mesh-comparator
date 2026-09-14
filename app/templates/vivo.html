@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}En vivo · Observatorio MeshCore 868{% endblock %}
+
+{% block content %}
+<h1>En vivo</h1>
+<p class="lede">
+  Cada paquete que el broker acaba de entregar, sin agregar. Sirve para comprobar que
+  un nodo está vivo y que un cambio de configuración ha surtido efecto, <strong>no</strong>
+  para decidir qué canal es mejor: un paquete suelto no dice nada sobre eso. Para
+  eso está el <a href="/comparador">comparador</a>.
+</p>
+
+<div class="controls">
+  <div class="field">
+    <span>Estado</span>
+    <div style="display:flex;gap:12px;align-items:center;">
+      <span class="live-dot" aria-hidden="true"></span>
+      <strong id="feed-status">al día</strong>
+    </div>
+  </div>
+  <button class="btn" id="feed-toggle" type="button">Pausar</button>
+  <p class="stamp" style="margin:0;">
+    Se consulta cada 2 s. Se conservan los 200 últimos en pantalla.
+  </p>
+</div>
+
+<div class="note" id="feed-error" hidden>
+  <p>
+    No se puede contactar con el servidor. La tabla deja de actualizarse, pero lo que
+    ya está en pantalla sigue siendo válido. Se reintenta solo.
+  </p>
+</div>
+
+<div class="table-scroll">
+  <table>
+    <thead>
+      <tr>
+        <th>Hora</th>
+        <th>Observador</th>
+        <th>Zona</th>
+        <th>Canal</th>
+        <th>SNR</th>
+        <th>RSSI</th>
+        <th>Tipo</th>
+        <th>Saltos</th>
+        <th>Hash</th>
+      </tr>
+    </thead>
+    <tbody id="feed">
+      {% for row in packets | reverse %}
+      <tr>
+        <td>{{ row.ts | ts | truncate(16, true, "") }}</td>
+        <td class="strong">{{ row.observer }}</td>
+        <td>{{ row.iata or "—" }}</td>
+        <td>{{ row.channel }}</td>
+        <td>{{ row.snr_db | snr }}</td>
+        <td>{{ row.rssi | db1 }}</td>
+        <td>{{ row.payload_type or "—" }}</td>
+        <td>{{ row.path_length if row.path_length is not none else "—" }}</td>
+        <td class="muted">{{ row.packet_hash[:8] if row.packet_hash else "—" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<p class="stamp" id="last-id-hidden" hidden>{{ last_id }}</p>
+{% if not packets %}
+<div class="empty-state">
+  <strong>Nada en el feed todavía</strong>
+  El recolector está conectado, pero aún no ha guardado ningún paquete. Aparecerán
+  aquí en cuanto lleguen.
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const feed = document.getElementById('feed');
+  const status = document.getElementById('feed-status');
+  const toggle = document.getElementById('feed-toggle');
+  const errorBox = document.getElementById('feed-error');
+  const marker = document.getElementById('last-id-hidden');
+
+  let lastId = Number(marker ? marker.textContent : 0) || 0;
+  let paused = false;
+  let failures = 0;
+
+  // Se construye el DOM con textContent, nunca con innerHTML: los nombres de los
+  // observadores vienen de la red y no son de fiar.
+  function buildRow(packet) {
+    const cells = [
+      packet.time,
+      packet.observer,
+      packet.iata || '—',
+      packet.channel,
+      packet.snr_db === null ? '—' : packet.snr_db.toFixed(1) + ' dB',
+      packet.rssi === null ? '—' : String(packet.rssi),
+      packet.payload_type || '—',
+      packet.path_length === null ? '—' : String(packet.path_length),
+      packet.hash || '—'
+    ];
+    const row = document.createElement('tr');
+    row.className = 'fresh';
+    cells.forEach(function (value, index) {
+      const cell = document.createElement('td');
+      cell.textContent = value;
+      if (index === 1) cell.className = 'strong';
+      if (index === 8) cell.className = 'muted';
+      row.appendChild(cell);
+    });
+    return row;
+  }
+
+  async function tick() {
+    if (paused) return;
+    try {
+      const response = await fetch('/api/packets?after=' + lastId + '&limit=100');
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      const data = await response.json();
+
+      failures = 0;
+      errorBox.hidden = true;
+      data.packets.forEach(function (packet) {
+        feed.prepend(buildRow(packet));
+        if (packet.id > lastId) lastId = packet.id;
+      });
+      while (feed.children.length > 200) feed.lastElementChild.remove();
+
+      status.textContent = data.packets.length
+        ? data.packets.length + ' nuevos'
+        : 'al día';
+    } catch (error) {
+      failures += 1;
+      errorBox.hidden = false;
+      status.textContent = 'sin conexión';
+    }
+  }
+
+  toggle.addEventListener('click', function () {
+    paused = !paused;
+    toggle.textContent = paused ? 'Reanudar' : 'Pausar';
+    status.textContent = paused ? 'pausado' : 'al día';
+    if (!paused) tick();
+  });
+
+  setInterval(tick, 2000);
+  tick();
+})();
+</script>
+{% endblock %}

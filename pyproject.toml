@@ -1,0 +1,10 @@
+[project]
+name = "cat-mesh-comparator"
+version = "0.1.0"
+description = "Observatorio de presets MeshCore 868 MHz para Cataluña"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-q"

@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}Metodología · Observatorio MeshCore 868{% endblock %}
+
+{% block content %}
+<h1>Metodología</h1>
+<p class="lede">
+  De dónde sale cada número, qué se puede sumar y qué no, y las trampas que hacen que
+  una lectura ingenua de las tablas lleve a conclusiones falsas.
+</p>
+
+<h2>El canal físico es la unidad</h2>
+<p class="prose">
+  Un <strong>canal físico</strong> es <code>(frecuencia, ancho, SF)</code>. La
+  <strong>CR no entra</strong>, y no es un descuido: la tasa de codificación viaja en
+  la cabecera LoRa, así que dos receptores con CR distinta sobre la misma frecuencia y
+  SF decodifican exactamente la misma transmisión.
+</p>
+<p class="prose">
+  Medido sobre este broker: <strong>8 receptores con 2 CR distintas</strong> oyendo el
+  mismo hash dentro de un solo canal físico, y <strong>0 hashes</strong> repartidos
+  entre dos canales. Sumar por configuración de receptor inflaba las transmisiones
+  distintas un <strong>30%</strong> (74 frente a 57 en la primera medición).
+</p>
+<p class="prose">
+  Además, el decoder <strong>no expone</strong> la CR con la que se emitió un paquete:
+  el <code>raw</code> empieza después de la cabecera. La CR solo se conoce como
+  configuración del receptor, que es lo que publica <code>/status</code>.
+</p>
+
+<h2>Qué se mide, y con qué</h2>
+<div class="table-scroll">
+  <table class="plain">
+    <thead>
+      <tr><th>Métrica</th><th>Cómo</th><th>Fuente</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="strong">Ruido de fondo</td>
+        <td>Media de <code>noise_floor</code> del receptor en la ventana.</td>
+        <td><code>/status</code>. Lo muestrea el firmware: media de 64 lecturas de RSSI
+          tomadas en silencio, recalculada cada ~2 s.</td>
+      </tr>
+      <tr>
+        <td class="strong">Ocupación</td>
+        <td><code>Δ(tx_air + rx_air) / Δt × 100</code></td>
+        <td><code>/status</code>. Es <em>derivada</em>: el firmware no la calcula.</td>
+      </tr>
+      <tr>
+        <td class="strong">Errores</td>
+        <td><code>Δ(recv_errors) / Δt</code></td>
+        <td><code>/status</code>. Es un proxy de CRC y colisiones, no un contador
+          dedicado.</td>
+      </tr>
+      <tr>
+        <td class="strong">SNR / RSSI</td>
+        <td>Mediana del percentil 50 por minuto, ponderada por volumen.</td>
+        <td><code>/packets</code>. Es una <strong>aproximación</strong>: para el
+          percentil exacto hay que ir a los paquetes crudos.</td>
+      </tr>
+      <tr>
+        <td class="strong">Transmisiones</td>
+        <td>Hashes distintos. Una transmisión cuenta una vez aunque la oigan ocho
+          receptores.</td>
+        <td><code>/packets</code></td>
+      </tr>
+      <tr>
+        <td class="strong">Recepciones</td>
+        <td>Cuántas veces se ha oído algo, sumando receptores.</td>
+        <td><code>/packets</code></td>
+      </tr>
+      <tr>
+        <td class="strong">PDR</td>
+        <td><code>|A∩B| / |A∪B|</code> sobre hashes, dentro del mismo canal físico y
+          minuto.</td>
+        <td><code>/packets</code></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+<p class="prose">
+  Se guardan <strong>tres niveles</strong> porque no hay uno solo correcto: el canal
+  físico para el tráfico, el preset exacto para saber qué ve un receptor concreto, y
+  el observador para ruido, ocupación y errores.
+</p>
+
+<h2>Seis trampas que hay que tener presentes</h2>
+
+<h3>1. La interferencia no aparece como paquetes</h3>
+<p class="prose">
+  MeshCore filtra por <em>sync word</em>. El tráfico de Meshtastic y de LoRaWAN
+  <strong>no llega a la aplicación</strong>: se descarta en el hardware. La firma de la
+  interferencia es una <strong>subida del ruido de fondo y de los errores</strong>, no
+  tráfico ajeno decodificable. Cualquier gráfico que prometa «paquetes de Meshtastic
+  detectados» estaría mintiendo.
+</p>
+
+<h3>2. El techo de frescura lo pone la fuente</h3>
+<p class="prose">
+  El ruido, la ocupación y los errores se publican cada <strong>300 s</strong> (medido:
+  11 intervalos de exactamente 300 s, uno de 60 s). Ninguna parte del sistema puede ser
+  más fresca que eso, y el intervalo de escritura no cambia nada de esto.
+</p>
+
+<h3>3. «¿Qué canal es mejor?» es una pregunta de distribuciones</h3>
+<p class="prose">
+  Un paquete suelto a SNR +12 dB no dice nada. Las tablas son medias y medianas sobre
+  una ventana precisamente porque un valor instantáneo es ruido, no señal.
+</p>
+
+<h3>4. Sin receptores no hay comparación</h3>
+<p class="prose">
+  Solo se puede comparar lo que alguien escucha. En la primera medición los slots 2 y 3
+  (869.493 y 869.556) estaban vacíos. <a href="/campana">Ver los huecos.</a>
+</p>
+
+<h3>5. La ventana de transición es ambigua</h3>
+<p class="prose">
+  Si un receptor cambia de configuración, el cambio ocurrió en algún punto entre los
+  dos <code>/status</code> que lo delimitan. Los paquetes de ese hueco se marcan como
+  dudosos y quedan fuera de los agregados. No se adivina a qué configuración
+  pertenecían.
+</p>
+
+<h3>6. El ranking es heurístico</h3>
+<p class="prose">
+  El índice de limpieza combina ruido (0,35), SNR (0,25), errores (0,25) y ocupación
+  (0,15) con pesos elegidos a mano. Es una ayuda para ordenar, no un veredicto: en las
+  tablas van siempre los valores crudos al lado para poder discrepar.
+</p>
+
+<h2>Sobre el hash</h2>
+<p class="prose">
+  El <code>hash</code> que publica el broker es <strong>idéntico entre receptores</strong>
+  para la misma transmisión — comprobado: un mismo hash lo oyeron 8 receptores
+  distintos. Es lo que permite cruzar observadores y calcular el PDR. Ojo: no es el
+  mismo valor que el <code>message_hash</code> que devuelve el decodificador de
+  paquetes; son dos cosas distintas y aquí se usa el del broker.
+</p>
+{% endblock %}

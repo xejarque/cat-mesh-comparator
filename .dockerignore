@@ -1,0 +1,23 @@
+.venv/
+.git/
+.gitignore
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.commandcode/
+
+# Datos y secretos: nunca dentro de la imagen.
+data/
+backups/
+*.db
+*.db-wal
+*.db-shm
+.env
+sample.jsonl
+
+# Los tests no van en la imagen: no se instala pytest dentro.
+tests/
+requirements-dev.txt
+pyproject.toml
+README.md
+docs/

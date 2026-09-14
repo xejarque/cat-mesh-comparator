@@ -1,0 +1,88 @@
+# Ojo con el volumen de SQLite: el colector y la web son DOS contenedores leyendo y
+# escribiendo el mismo fichero. Funciona porque va en un volumen con nombre
+# (`catmesh-data`), que vive dentro de la máquina Linux de Docker y por tanto tiene
+# memoria compartida POSIX de verdad, que es lo que necesita el modo WAL. No lo cambies
+# por un bind mount a una carpeta del anfitrión sin probarlo antes.
+
+name: cat-mesh-comparator
+
+services:
+  # Escucha el broker y escribe en SQLite. Dentro corre también el rollup periódico.
+  collector:
+    build: .
+    image: cat-mesh-comparator
+    command: python -m app.mqtt.collector
+    env_file: [.env]
+    environment:
+      CATMESH_DB: /data/catmesh.db
+    volumes:
+      - catmesh-data:/data
+    restart: unless-stopped
+    healthcheck:
+      # Un colector parado no avisa por sí solo: se comprueba desde fuera.
+      test: ["CMD", "python", "scripts/check_collector.py", "--db", "/data/catmesh.db"]
+      interval: 5m
+      timeout: 10s
+      start_period: 5m
+      retries: 2
+
+  web:
+    build: .
+    image: cat-mesh-comparator
+    command: python -m uvicorn app.web.main:app --host 0.0.0.0 --port 8000
+    env_file: [.env]
+    environment:
+      CATMESH_DB: /data/catmesh.db
+    volumes:
+      - catmesh-data:/data
+    # Solo en localhost: quien atiende al público es Caddy, no esto.
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      collector:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/', timeout=4).status == 200 else 1)"
+      interval: 30s
+      timeout: 10s
+      start_period: 20s
+      retries: 3
+
+  # Copia diaria de la base de datos con `sqlite3 .backup`, que es seguro en caliente.
+  backup:
+    build: .
+    image: cat-mesh-comparator
+    command: ["sh", "-c", "while true; do /app/deploy/backup.sh; sleep 86400; done"]
+    environment:
+      CATMESH_DB: /data/catmesh.db
+      CATMESH_BACKUP_DIR: /backups
+    volumes:
+      - catmesh-data:/data
+      - ./backups:/backups
+    restart: unless-stopped
+
+  # TLS automático. Es el único que escucha en internet.
+  caddy:
+    image: caddy:2-alpine
+    environment:
+      CATMESH_SITE: ${CATMESH_SITE:-localhost}
+      CATMESH_UPSTREAM: web:8000
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on: [web]
+    restart: unless-stopped
+
+volumes:
+  catmesh-data:
+  caddy-data:
+  caddy-config:

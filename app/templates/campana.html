@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}Campaña · Observatorio MeshCore 868{% endblock %}
+
+{% block content %}
+<h1>Campaña</h1>
+
+<div class="note warn">
+  <p>
+    <strong>Esto es el límite duro del observatorio.</strong> Solo se puede comparar
+    lo que alguien está escuchando. Una combinación de frecuencia, ancho y SF sin
+    receptores encima no produce datos, y ninguna cantidad de análisis la va a
+    inventar. Esta página existe para ver exactamente dónde están los huecos.
+  </p>
+</div>
+
+<p class="lede">
+  Estado de cada configuración conocida, con cuántos observadores la tienen puesta.
+  Lo que se busca es que los cuatro slots estrechos de h1.4 tengan cobertura
+  simultánea para poder compararlos con las mismas condiciones de propagación.
+</p>
+
+{% if catalog %}
+<div class="table-scroll">
+  <table>
+    <thead>
+      <tr>
+        <th>Frecuencia</th>
+        <th>Ancho</th>
+        <th>SF</th>
+        <th>CR de los receptores</th>
+        <th>Observadores</th>
+        <th>Última vez visto</th>
+        <th>Estado</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in catalog %}
+      <tr>
+        <td class="strong">{{ row.freq_mhz | mhz }}</td>
+        <td>{{ row.bw_khz | khz }}</td>
+        <td>{{ row.sf }}</td>
+        <td class="muted">{{ row.cr }}</td>
+        <td>{{ row.observers or 0 }}</td>
+        <td class="muted">{{ row.last_seen | ago }}</td>
+        <td>
+          {% if row.observers %}
+            cubierto
+          {% else %}
+            <span class="muted">sin nadie escuchando</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<h2>Qué haría falta</h2>
+<ol class="prose">
+  <li>
+    <strong>Un receptor por slot, a la vez.</strong> Comparar 869.431 contra 869.619
+    solo tiene sentido si las dos se miden en la misma franja horaria: la propagación
+    cambia con la hora y con el día.
+  </li>
+  <li>
+    <strong>Separación geográfica.</strong> Con receptores del mismo sitio, el PDR sale
+    cercano al 100% y no informa de nada. Los pares que no oyen nada en común son los
+    que dicen algo sobre cobertura.
+  </li>
+  <li>
+    <strong>Status activo.</strong> Un observador que no publica <code>/status</code> con
+    <code>radio</code> no se puede atribuir a ningún canal; sus paquetes se descartan del
+    análisis. En algunos despliegues basta con bajar
+    <code>PACKETCAPTURE_STATS_REFRESH_INTERVAL</code> y comprobar que el status está
+    habilitado.
+  </li>
+</ol>
+
+<h2>Protocolo, si lo que se quiere es mover toda la red</h2>
+<p class="prose">
+  Esta es la parte que convierte el observatorio en algo que sirve para decidir. La
+  comparación entre períodos existe, pero
+  <strong>un experimento mal hecho no lo arregla ningún análisis posterior</strong>.
+</p>
+
+<ol class="prose">
+  <li>
+    <strong>Mover a todos a la vez, no por goteo.</strong> Si la mitad de la red se
+    muda el martes y la otra mitad el viernes, dos períodos se convierten en cuatro
+    transiciones y ya no hay nada que comparar. Se acuerda día y hora, y se cambia
+    todo junto.
+  </li>
+  <li>
+    <strong>A-B-A, no solo A-B.</strong> Una semana en A, una en B y <em>otra vuelta a
+    A</em>. Las dos semanas en A son el <strong>control</strong>: miden cuánta
+    diferencia provoca el simple paso del tiempo. Sin eso, la herramienta no puede
+    distinguir el canal de la meteorología, y lo dirá en vez de dar un veredicto.
+  </li>
+  <li>
+    <strong>Misma duración y mismos receptores</strong> en cada período. El análisis
+    solo compara los nodos presentes en los dos, así que añadir gente a mitad de
+    campaña no suma: resta.
+  </li>
+  <li>
+    <strong>Anotar la fecha y hora exactas del cambio.</strong> Son las que delimitan
+    los períodos. La detección automática las deduce de los datos, pero un cambio
+    apuntado evita discusiones.
+  </li>
+  <li>
+    <strong>Elegir bien qué se compara.</strong> Tiene sentido probar un slot claramente
+    distinto, por ejemplo 869.450 frente al 869.618 actual, y no dos que ya compartan
+    frecuencia: dos receptores con SF distinto <em>no se oyen entre sí</em>, así que sus
+    métricas describen poblaciones distintas de emisores.
+  </li>
+</ol>
+
+<div class="note">
+  <p>
+    <strong>Qué mirar en los resultados.</strong> En
+    <a href="/comparar?mode=periodos">Comparar → Por períodos</a>, la columna que
+    importa es la que enfrenta la diferencia entre canales con la diferencia entre dos
+    períodos del mismo canal.
+  </p>
+  <p>
+    Y qué <strong>no</strong> concluir: si las dos diferencias son parecidas, la
+    respuesta honesta es que <em>no se puede concluir nada</em>. Significa que la
+    variación normal de la red entre dos semanas es tan grande como el efecto que se
+    quería medir, y eso no es un fallo de la herramienta, es lo que dicen los datos.
+  </p>
+</div>
+{% else %}
+<div class="empty-state">
+  <strong>Todavía no hay configuraciones registradas</strong>
+  Aparecerán solas en cuanto el primer observador publique su <code>/status</code>.
+</div>
+{% endif %}
+{% endblock %}

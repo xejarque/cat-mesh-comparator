@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.env
+data/
+backups/
+*.db
+*.db-wal
+*.db-shm
+sample.jsonl
+app/static/css/app.css
+# Configuración local de la herramienta: camina con rutas y órdenes de esta máquina.
+.commandcode/

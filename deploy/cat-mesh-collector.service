@@ -1,0 +1,27 @@
+[Unit]
+Description=cat-mesh-comparator - colector MQTT MeshCore 868
+Documentation=https://github.com/example/cat-mesh-comparator
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=catmesh
+Group=catmesh
+WorkingDirectory=/opt/cat-mesh-comparator
+EnvironmentFile=/opt/cat-mesh-comparator/.env
+ExecStart=/opt/cat-mesh-comparator/.venv/bin/python -m app.mqtt.collector
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Endurecimiento: el proceso solo necesita escribir en ./data
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/cat-mesh-comparator/data
+
+[Install]
+WantedBy=multi-user.target

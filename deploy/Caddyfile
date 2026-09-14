@@ -1,0 +1,6 @@
+# Nombre del sitio y a dónde va el proxy. Los mismos valores sirven en local
+# (Caddy fuera de Docker) y dentro de Compose, donde el upstream es el servicio `web`.
+{$CATMESH_SITE:localhost} {
+	encode zstd gzip
+	reverse_proxy {$CATMESH_UPSTREAM:localhost:8000}
+}
