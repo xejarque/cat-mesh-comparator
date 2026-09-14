@@ -35,10 +35,13 @@ services:
       CATMESH_DB: /data/catmesh.db
     volumes:
       - catmesh-data:/data
-    # Por defecto solo escucha en localhost, que es lo prudente. Si accedes por VPN,
-    # pon CATMESH_BIND a la dirección de la VPN (o a 0.0.0.0 si te da igual la LAN).
+    # Se publica en todas las interfaces, como cualquier otro servicio: responde en
+    # <ip-del-host>:8000, sea la de la LAN o la de la VPN.
+    #
+    # Si algún día publicas con el perfil `tls`, pon CATMESH_BIND=127.0.0.1 para que
+    # la única puerta desde internet sea Caddy y no este puerto a pelo.
     ports:
-      - "${CATMESH_BIND:-127.0.0.1}:${CATMESH_PORT:-8000}:8000"
+      - "${CATMESH_BIND:-0.0.0.0}:${CATMESH_PORT:-8000}:8000"
     depends_on:
       collector:
         condition: service_started

@@ -343,16 +343,10 @@ alcanzable para el desafío, y no hace falta, porque la VPN ya cifra el tránsit
 punta a punta. Añadir TLS solo serviría para ver un aviso del navegador si no instalas
 la autoridad de Caddy en cada dispositivo.
 
-Lo que sí hay que hacer es **escuchar en la interfaz de la VPN**, que por defecto no se
-hace (la web nace en `127.0.0.1`, que es lo prudente):
-
-```bash
-# En .env
-CATMESH_BIND=100.x.y.z    # la dirección que te da la VPN
-```
-
-Y se accede con `http://100.x.y.z:8000`. Con `CATMESH_BIND=0.0.0.0` escucha también en
-la red local.
+**Y no hay que configurar nada para que responda.** La web se publica en todas las
+interfaces, así que contesta en `http://<ip-del-host>:8000` — sea la de la LAN o la de
+la VPN — igual que cualquier otro servicio. Solo hace falta tocar `CATMESH_BIND` si
+quieres **restringirla** a una interfaz concreta.
 
 ### Publicarlo de verdad (TLS)
 
