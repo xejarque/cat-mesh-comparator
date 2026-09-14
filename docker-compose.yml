@@ -70,6 +70,26 @@ services:
       - ./backups:/backups
     restart: unless-stopped
 
+  # Publica la web a internet **sin abrir puertos**, a través de Cloudflare. El TLS lo
+  # pone su red, así que Caddy no hace falta para esto.
+  #
+  #   1. Crea el túnel en el panel de Cloudflare (Zero Trust > Networks > Tunnels)
+  #      y copia el token.
+  #   2. En el túnel, añade un «public hostname»:
+  #         observatorio.tudominio.cat  ->  http://web:8000
+  #   3. pon el token en .env y arranca:
+  #         docker compose --profile tunnel up -d
+  cloudflared:
+    profiles: ["tunnel"]
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run
+    environment:
+      # Con `:-` vacío, el fichero valida aunque no uses el túnel; si falta el token,
+      # cloudflared lo dirá al arrancar.
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on: [web]
+    restart: unless-stopped
+
   # TLS automático, para cuando el sitio se publique de verdad. **No arranca por
   # defecto**: si accedes por VPN no puede obtener certificado (la máquina no es
   # alcanzable desde internet) y la propia VPN ya cifra el tránsito.
