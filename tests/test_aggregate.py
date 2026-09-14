@@ -164,6 +164,153 @@ def test_channel_aggregate_does_not_double_count_co_channel_cr_variants():
     assert channel.crs == (6, 8)
 
 
+def test_channel_bytes_count_each_transmission_once():
+    # `aa` lo oyen dos receptores, pero es UNA transmisión. Trama de 40 B en el aire.
+    trama = "aa" * 40
+    result = aggregate(
+        [],
+        [
+            attribute(
+                mk_packet("2026-09-14T10:00:10Z", "OBS1", packet_hash="aa", raw=trama),
+                SLOT_A,
+            ),
+            attribute(
+                mk_packet("2026-09-14T10:00:11Z", "OBS2", packet_hash="aa", raw=trama),
+                SLOT_A,
+            ),
+            attribute(
+                mk_packet("2026-09-14T10:00:12Z", "OBS1", packet_hash="bb", raw=trama),
+                SLOT_A,
+            ),
+        ],
+    )
+
+    channel = result.channels[0]
+    assert channel.uniq_hashes == 2
+    assert channel.payload_bytes == 80
+    assert channel.payload_sizes == ((40, 2),)
+
+
+def test_bytes_are_the_frame_on_air_not_the_application_payload():
+    # El `payload_len` de aplicación son 32 B; la trama en el aire, 60. Se usa la
+    # segunda, que es la que entra en la fórmula de tiempo de aire.
+    result = aggregate(
+        [],
+        [
+            attribute(
+                mk_packet(
+                    "2026-09-14T10:00:10Z", "OBS1", packet_hash="aa", raw="aa" * 60
+                ),
+                SLOT_A,
+            ),
+        ],
+    )
+
+    assert result.channels[0].payload_sizes == ((60, 1),)
+
+
+def test_channel_keeps_the_size_mix_not_just_a_total():
+    # Tráfico bimodal: control pequeño por un lado, adverts grandes por otro. El panel
+    # modela esta mezcla, no su media, porque la media no es ningún paquete real.
+    result = aggregate(
+        [],
+        [
+            attribute(
+                mk_packet("2026-09-14T10:00:10Z", "OBS1", packet_hash="s1", raw="aa" * 22),
+                SLOT_A,
+            ),
+            attribute(
+                mk_packet("2026-09-14T10:00:11Z", "OBS1", packet_hash="s2", raw="aa" * 22),
+                SLOT_A,
+            ),
+            attribute(
+                mk_packet("2026-09-14T10:00:12Z", "OBS1", packet_hash="b1", raw="bb" * 124),
+                SLOT_A,
+            ),
+        ],
+    )
+
+    channel = result.channels[0]
+    assert channel.payload_sizes == ((22, 2), (124, 1))
+    assert channel.payload_bytes == 22 * 2 + 124
+
+
+def test_packets_without_a_hash_count_their_bytes_once_each():
+    # Sin hash no hay forma de saber que son la misma transmisión, así que se cuentan
+    # igual que las transmisiones distintas: una por paquete.
+    trama = "aa" * 40
+    result = aggregate(
+        [],
+        [
+            attribute(mk_packet("2026-09-14T10:00:10Z", "OBS1", raw=trama), SLOT_A),
+            attribute(mk_packet("2026-09-14T10:00:11Z", "OBS1", raw=trama), SLOT_A),
+        ],
+    )
+
+    channel = result.channels[0]
+    assert channel.uniq_hashes == 0
+    assert channel.payload_sizes == ((40, 2),)
+
+
+def test_packets_without_a_frame_fall_back_to_the_application_length():
+    from app.models import AttributedPacket, Attribution, Packet
+
+    packet = Packet(
+        ts=epoch("2026-09-14T10:00:10Z"),
+        observer_pubkey="OBS1",
+        iata="BAR",
+        snr_x4=None,
+        rssi=None,
+        packet_type=None,
+        route=None,
+        payload_len=17,
+        raw_hex=None,
+        origin=None,
+        packet_hash="aa",
+    )
+    result = aggregate(
+        [],
+        [
+            AttributedPacket(
+                packet=packet,
+                attribution=Attribution(preset=SLOT_A, uncertain=False),
+            )
+        ],
+    )
+
+    assert result.channels[0].payload_sizes == ((17, 1),)
+
+
+def test_packets_without_a_length_do_not_add_bytes():
+    from app.models import AttributedPacket, Attribution, Packet
+
+    packet = Packet(
+        ts=epoch("2026-09-14T10:00:10Z"),
+        observer_pubkey="OBS1",
+        iata="BAR",
+        snr_x4=None,
+        rssi=None,
+        packet_type=None,
+        route=None,
+        payload_len=None,
+        raw_hex=None,
+        origin=None,
+        packet_hash="aa",
+    )
+    result = aggregate(
+        [],
+        [
+            AttributedPacket(
+                packet=packet,
+                attribution=Attribution(preset=SLOT_A, uncertain=False),
+            )
+        ],
+    )
+
+    assert result.channels[0].payload_bytes == 0
+    assert result.channels[0].payload_sizes == ()
+
+
 def test_pdr_pairs_observers_differing_only_in_coding_rate():
     # Antes no se emparejaban porque el emparejamiento era por preset exacto, y son
     # justo los que más sentido tiene comparar: oyen exactamente lo mismo.

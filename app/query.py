@@ -11,11 +11,13 @@ cada paquete oído por receptores de CR distinta. Ver ``docs/format-findings.md`
 from __future__ import annotations
 
 import sqlite3
-from collections import defaultdict
+from collections import Counter, defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from app.aggregate import ObserverMinute, PairMinute, PresetMinute
 from app.geo import haversine_km
+from app.lora import AirtimeProjection, project_sf_ladder
 from app.metrics import PresetSummary, summarize
 from app.models import PresetKey
 from app.presets import channel_label, parse_channel_id, preset_label, slot_index
@@ -267,6 +269,166 @@ def channel_series(
 
     return {
         label: sorted(points.items()) for label, points in sorted(series.items())
+    }
+
+
+@dataclass(frozen=True, slots=True)
+class ChannelCost:
+    """Tráfico **medido** de un canal físico y su coste de aire **modelado**.
+
+    Los bytes salen de ``channel_minute.payload_bytes``: son medición. Las
+    proyecciones por SF salen de ``app.lora``: son modelo, porque el broker no publica
+    con qué SF se emitió una transmisión. Se mezclan en la misma fila a propósito, pero
+    la web los etiqueta por separado.
+    """
+
+    channel_label: str
+    freq_mhz: float
+    bw_khz: float
+    sf: int
+    # CR dominante de los receptores del canal; ``None`` si no se conoce y entonces no
+    # se modela (sin CR no hay fórmula que aplicar).
+    cr: int | None
+    transmissions: int
+    transmissions_per_h: float
+    payload_bytes_total: int
+    bytes_per_h: float
+    # Tamaño mediano **en el aire**. Es la referencia honesta: la media no describe
+    # ningún paquete porque el tráfico es bimodal.
+    median_size_bytes: int | None
+    # Mezcla real observada, `(bytes, transmisiones)`, ordenada por tamaño.
+    sizes: tuple[tuple[int, int], ...]
+    snr_p50_db: float | None
+    noise_floor_dbm: float | None
+    minutes: int
+    projections: tuple[AirtimeProjection, ...]
+
+    @property
+    def can_model(self) -> bool:
+        return bool(self.projections)
+
+    @property
+    def distinct_sizes(self) -> int:
+        return len(self.sizes)
+
+    @property
+    def top_sizes(self) -> tuple[tuple[int, int], ...]:
+        """Los tamaños más frecuentes, para enseñar la mezcla sin volcar todo."""
+        return tuple(sorted(self.sizes, key=lambda item: -item[1])[:4])
+
+
+def channel_costs(
+    conn: sqlite3.Connection, since_ts: int, until_ts: int | None = None
+) -> list[ChannelCost]:
+    """Coste por canal físico: bytes medidos + aire modelado por SF.
+
+    Agrupa por ``channel_id``, no por sujeto apareado: la pregunta («¿cuánto cuesta
+    cambiar de SF?») es del canal, no de un receptor concreto.
+    """
+    grouped: dict[str, list[sqlite3.Row]] = defaultdict(list)
+    for row in _channel_rows(conn, since_ts, until_ts):
+        grouped[row["channel_id"]].append(row)
+
+    noise_by_channel = _noise_by_channel(conn, since_ts, until_ts)
+
+    costs: list[ChannelCost] = []
+    for channel_id_value, items in grouped.items():
+        freq, bw, sf = parse_channel_id(channel_id_value)
+        weights = [row["pkts"] for row in items]
+        transmissions = sum(row["uniq_hashes"] for row in items)
+        minutes = len(items)
+        active_seconds = minutes * 60.0
+        sizes = _merge_sizes(_parse_sizes(row["payload_sizes"]) for row in items)
+        payload_bytes = sum(size * count for size, count in sizes.items())
+        snr = _to_db(weighted_mean([row["snr_p50_x4"] for row in items], weights))
+        cr = _dominant_cr(items)
+
+        costs.append(
+            ChannelCost(
+                channel_label=channel_label((freq, bw, sf), DIMENSIONS),
+                freq_mhz=freq,
+                bw_khz=bw,
+                sf=sf,
+                cr=cr,
+                transmissions=transmissions,
+                transmissions_per_h=(
+                    (transmissions * 60.0 / minutes) if minutes else 0.0
+                ),
+                payload_bytes_total=payload_bytes,
+                bytes_per_h=(payload_bytes * 60.0 / minutes) if minutes else 0.0,
+                median_size_bytes=_median_size(sizes),
+                sizes=tuple(sorted(sizes.items())),
+                snr_p50_db=snr,
+                noise_floor_dbm=noise_by_channel.get((freq, bw, sf)),
+                minutes=minutes,
+                projections=(
+                    ()
+                    if cr is None
+                    else project_sf_ladder(
+                        bw_khz=bw,
+                        cr=cr,
+                        sizes=sizes,
+                        active_seconds=active_seconds,
+                        current_sf=sf,
+                        snr_p50_db=snr,
+                    )
+                ),
+            )
+        )
+    return sorted(costs, key=lambda row: (-row.transmissions, row.channel_label))
+
+
+def _parse_sizes(value: str | None) -> dict[int, int]:
+    """Inversa de la mezcla que escribe el rollup: ``"22:495,124:649"``."""
+    if not value:
+        return {}
+    sizes: dict[int, int] = {}
+    for part in value.split(","):
+        size, _, count = part.partition(":")
+        try:
+            sizes[int(size)] = sizes.get(int(size), 0) + int(count)
+        except ValueError:
+            continue
+    return sizes
+
+
+def _merge_sizes(parts: Iterable[dict[int, int]]) -> dict[int, int]:
+    merged: dict[int, int] = {}
+    for part in parts:
+        for size, count in part.items():
+            merged[size] = merged.get(size, 0) + count
+    return merged
+
+
+def _median_size(sizes: dict[int, int]) -> int | None:
+    value = weighted_median(list(sizes), list(sizes.values()))
+    return None if value is None else int(round(value))
+
+
+def _dominant_cr(items: list[sqlite3.Row]) -> int | None:
+    counts = Counter(cr for row in items for cr in _parse_crs(row["crs"]))
+    if not counts:
+        return None
+    return counts.most_common(1)[0][0]
+
+
+def _noise_by_channel(
+    conn: sqlite3.Connection, since_ts: int, until_ts: int | None
+) -> dict[tuple[float, float, int], float]:
+    """Ruido medio por canal físico. Viene del observer, no del paquete."""
+    bounds, params = _bounds("om.minute_ts", since_ts, until_ts)
+    rows = conn.execute(
+        f"""SELECT p.freq_mhz, p.bw_khz, p.sf, AVG(om.noise_floor) AS noise
+            FROM observer_minute om
+            JOIN presets p ON p.preset_id = om.preset_id
+            WHERE {bounds}
+            GROUP BY p.freq_mhz, p.bw_khz, p.sf""",
+        params,
+    ).fetchall()
+    return {
+        (row["freq_mhz"], row["bw_khz"], row["sf"]): row["noise"]
+        for row in rows
+        if row["noise"] is not None
     }
 
 
@@ -716,48 +878,127 @@ def paired_pairs(
     return _subjects(grouped, displays, {}, distances)
 
 
-def paired_regions(
-    conn: sqlite3.Connection, since_ts: int, until_ts: int | None = None
-) -> list[PairedSubject]:
-    """Misma comarca en varios canales.
+def _delta(value: float | None, reference: float | None) -> float | None:
+    if value is None or reference is None:
+        return None
+    return value - reference
 
-    Es la comparación más débil de las tres: comparte geografía, pero **no** los
-    receptores, así que siguen cambiando el equipo y la antena. Se ofrece solo para
-    cuando no hay nada mejor, y la web lo dice.
+
+@dataclass(frozen=True, slots=True)
+class RegionMeasurement:
+    """Lo que una comarca ve de un canal, y su **diferencia** con la referencia.
+
+    Las diferencias se calculan aquí y no en la plantilla: comparar es poner delante
+    la diferencia, y una tabla de valores en paralelo no compara nada.
+    """
+
+    region: str
+    first_ts: int
+    last_ts: int
+    observers: int
+    minutes: int
+    noise_floor_dbm: float | None
+    chan_util_pct: float | None
+    # Diferencia con la comarca de referencia. En ruido y ocupación, **negativo es
+    # mejor**: más silencioso o menos ocupado.
+    noise_delta_db: float | None
+    util_delta_pct: float | None
+    is_reference: bool
+
+
+@dataclass(frozen=True, slots=True)
+class ChannelRegions:
+    """Un canal físico medido por varias comarcas.
+
+    Se comparan comarcas **sobre el mismo canal** (misma frecuencia, ancho y SF), no
+    canales dentro de una comarca. Al revés se caía justo en el caso traicionero
+    —misma frecuencia con distinto SF—, donde cada receptor oye a emisores distintos.
+    """
+
+    channel_label: str
+    freq_mhz: float
+    bw_khz: float
+    sf: int
+    overlap_seconds: int
+    reference: str
+    regions: tuple[RegionMeasurement, ...]
+
+    @property
+    def comparable(self) -> bool:
+        # Menos de dos comarcas no es una comparación, y sin solapamiento temporal la
+        # diferencia podría ser propagación y no entorno.
+        return len(self.regions) >= 2 and self.overlap_seconds > 0
+
+
+def channel_regions(
+    conn: sqlite3.Connection, since_ts: int, until_ts: int | None = None
+) -> list[ChannelRegions]:
+    """Comarcas que han medido cada canal físico, con su referencia y diferencias.
+
+    No controla el receptor —cada comarca tiene el suyo—, así que orienta pero no
+    concluye. Lo que sí controla es el canal, que es lo que se discute.
     """
     bounds, params = _bounds("om.minute_ts", since_ts, until_ts)
     rows = conn.execute(
-        f"""SELECT o.iata, p.freq_mhz, p.bw_khz, p.sf,
+        f"""SELECT p.freq_mhz, p.bw_khz, p.sf, o.iata,
                    COUNT(DISTINCT om.pubkey) AS observers,
-                   MIN(om.minute_ts) AS first_ts, MAX(om.minute_ts) AS last_ts,
-                   AVG(om.noise_floor) AS noise, SUM(om.pkts_rx) AS pkts_rx
+                   COUNT(*) AS minutes,
+                   AVG(om.noise_floor) AS noise,
+                   AVG(om.chan_util_pct) AS util,
+                   MIN(om.minute_ts) AS first_ts,
+                   MAX(om.minute_ts) AS last_ts
             FROM observer_minute om
             JOIN observers o ON o.pubkey = om.pubkey
             JOIN presets p ON p.preset_id = om.preset_id
             WHERE {bounds} AND o.iata IS NOT NULL
-            GROUP BY o.iata, p.freq_mhz, p.bw_khz, p.sf""",
+            GROUP BY p.freq_mhz, p.bw_khz, p.sf, o.iata""",
         params,
     ).fetchall()
 
-    grouped: dict[str, list[PairedMeasurement]] = defaultdict(list)
-    displays: dict[str, str] = {}
+    grouped: dict[tuple[float, float, int], list[sqlite3.Row]] = defaultdict(list)
     for row in rows:
-        displays[row["iata"]] = row["iata"]
-        grouped[row["iata"]].append(
-            _measurement(
-                row["freq_mhz"],
-                row["bw_khz"],
-                row["sf"],
-                row["first_ts"],
-                row["last_ts"],
-                (
-                    Metric("Ruido de fondo", row["noise"], "dbm"),
-                    Metric("Observadores", row["observers"], "num"),
-                    Metric("Recepciones", row["pkts_rx"], "num"),
+        grouped[(row["freq_mhz"], row["bw_khz"], row["sf"])].append(row)
+
+    channels: list[ChannelRegions] = []
+    for (freq, bw, sf), items in grouped.items():
+        # La referencia es la comarca con más receptores (y a igualdad, más minutos):
+        # la que más datos aporta, no la que sale mejor. Elegir «la mejor» sería un
+        # veredicto disfrazado de línea base.
+        ordered = sorted(
+            items, key=lambda row: (-row["observers"], -row["minutes"], row["iata"])
+        )
+        reference = ordered[0]
+        ref_noise = reference["noise"]
+        ref_util = reference["util"]
+        first_ts = max(row["first_ts"] for row in items)
+        last_ts = min(row["last_ts"] for row in items)
+
+        channels.append(
+            ChannelRegions(
+                channel_label=channel_label((freq, bw, sf), DIMENSIONS),
+                freq_mhz=freq,
+                bw_khz=bw,
+                sf=sf,
+                overlap_seconds=max(0, last_ts - first_ts),
+                reference=reference["iata"],
+                regions=tuple(
+                    RegionMeasurement(
+                        region=row["iata"],
+                        first_ts=row["first_ts"],
+                        last_ts=row["last_ts"],
+                        observers=row["observers"],
+                        minutes=row["minutes"],
+                        noise_floor_dbm=row["noise"],
+                        chan_util_pct=row["util"],
+                        noise_delta_db=_delta(row["noise"], ref_noise),
+                        util_delta_pct=_delta(row["util"], ref_util),
+                        is_reference=row["iata"] == reference["iata"],
+                    )
+                    for row in ordered
                 ),
             )
         )
-    return _subjects(grouped, displays, {})
+    return sorted(channels, key=lambda row: (not row.comparable, row.channel_label))
 
 
 def _observer_names(conn: sqlite3.Connection) -> dict[str, str]:

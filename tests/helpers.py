@@ -134,6 +134,7 @@ def fill_observer_minute(
     noise: float = -100.0,
     pkts_rx: int = 2,
     snr_x4: float | None = None,
+    iata: str = "BAR",
 ) -> None:
     """Escribe ``observer_minute`` directamente.
 
@@ -145,7 +146,7 @@ def fill_observer_minute(
 
     base = epoch(start_iso)
     preset_id = ensure_preset(conn, preset)
-    ensure_observer(conn, pubkey, iata="BAR", ts=base)
+    ensure_observer(conn, pubkey, iata=iata, ts=base)
     conn.executemany(
         """INSERT OR REPLACE INTO observer_minute
            (pubkey, minute_ts, preset_id, noise_floor, chan_util_pct, err_per_h,
@@ -168,18 +169,31 @@ def fill_channel_minute(
     uniq_hashes: int = 5,
     snr_p50_x4: float = 40.0,
     observers: int = 2,
+    sizes: dict[int, int] | None = None,
 ) -> None:
-    """Escribe ``channel_minute`` directamente, para los tests del comparador."""
+    """Escribe ``channel_minute`` directamente, para los tests del comparador.
+
+    ``sizes`` es la mezcla de tamaños en el aire (``{bytes: transmisiones}``). Sin ella
+    el canal no se puede modelar, que es justo lo que comprueba un test.
+    """
     from app.db import ensure_preset
     from app.presets import channel_id
+
+    payload_bytes = sum(size * count for size, count in (sizes or {}).items())
+    encoded = (
+        ",".join(f"{size}:{count}" for size, count in sorted(sizes.items()))
+        if sizes
+        else None
+    )
 
     base = epoch(start_iso)
     ensure_preset(conn, preset)
     conn.executemany(
         """INSERT OR REPLACE INTO channel_minute
            (minute_ts, channel_id, freq_mhz, bw_khz, sf, pkts, uniq_hashes,
-            snr_avg_x4, snr_p50_x4, snr_ge0_pct, rssi_avg, observers, crs)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            payload_bytes, payload_sizes, snr_avg_x4, snr_p50_x4, snr_ge0_pct,
+            rssi_avg, observers, crs)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         [
             (
                 base + index * 60,
@@ -189,6 +203,8 @@ def fill_channel_minute(
                 preset.sf,
                 pkts,
                 uniq_hashes,
+                payload_bytes,
+                encoded,
                 snr_p50_x4,
                 snr_p50_x4,
                 100.0,

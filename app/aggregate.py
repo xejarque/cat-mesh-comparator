@@ -12,7 +12,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from statistics import fmean, median
 
-from app.models import AttributedPacket, PresetKey, Status
+from app.models import AttributedPacket, Packet, PresetKey, Status
 from app.stats import median as _median
 
 SECONDS_PER_MINUTE = 60
@@ -65,6 +65,14 @@ class ChannelMinute:
     sf: int
     pkts: int
     uniq_hashes: int
+    # Bytes de las transmisiones **distintas** del minuto: mismo criterio que
+    # `uniq_hashes`, para no multiplicar por el número de receptores que las oyeron.
+    # Son los bytes **en el aire** (la trama LoRa), no el payload de aplicación.
+    payload_bytes: int
+    # Mezcla de tamaños: `(bytes en el aire, nº de transmisiones)` ordenado. Se guarda
+    # entera y no solo la suma porque el tráfico es bimodal y su media no describe
+    # ningún paquete real: el modelo de aire se calcula sobre la mezcla.
+    payload_sizes: tuple[tuple[int, int], ...]
     snr_avg_x4: float | None
     snr_p50_x4: float | None
     snr_ge0_pct: float | None
@@ -137,6 +145,43 @@ def _packet_stats(
     )
 
 
+def _on_air_bytes(packet: Packet) -> int | None:
+    """Bytes que la transmisión ocupa **en el aire**: el tamaño de la trama LoRa.
+
+    Es la longitud del `raw` (la cabecera y la ruta incluidas), que es lo que entra en
+    la fórmula de tiempo de aire. El `payload_len` que publica el broker es el payload
+    de **aplicación** y es más pequeño: en un Ack de 6 B, la trama en el aire llega a
+    20-24 B. Se usa como respaldo solo si no hay `raw`.
+    """
+    if packet.raw_hex:
+        return len(packet.raw_hex) // 2
+    return packet.payload_len
+
+
+def _unique_payload_sizes(
+    items: list[AttributedPacket],
+) -> tuple[tuple[int, int], ...]:
+    """Mezcla de tamaños de las transmisiones distintas, cada hash una sola vez.
+
+    Sin deduplicar por hash, una transmisión que oyen ocho receptores contaría ocho
+    veces y el tráfico se multiplicaría por el número de receptores. Un paquete sin
+    hash no se puede deduplicar, así que cuenta por sí mismo.
+    """
+    seen: set[object] = set()
+    counts: dict[int, int] = {}
+    for row in items:
+        key: object = row.packet.packet_hash
+        if key is None:
+            key = id(row.packet)
+        if key in seen:
+            continue
+        seen.add(key)
+        size = _on_air_bytes(row.packet)
+        if size:
+            counts[size] = counts.get(size, 0) + 1
+    return tuple(sorted(counts.items()))
+
+
 def _preset_minutes(packets: list[AttributedPacket]) -> list[PresetMinute]:
     grouped: dict[tuple[int, PresetKey], list[AttributedPacket]] = defaultdict(list)
     for row in packets:
@@ -174,6 +219,7 @@ def _channel_minutes(packets: list[AttributedPacket]) -> list[ChannelMinute]:
     minutes: list[ChannelMinute] = []
     for (minute_ts, freq, bw, sf), items in sorted(grouped.items()):
         pkts, uniq, snr_avg, snr_p50, ge0, rssi, observers = _packet_stats(items)
+        sizes = _unique_payload_sizes(items)
         minutes.append(
             ChannelMinute(
                 minute_ts=minute_ts,
@@ -182,6 +228,8 @@ def _channel_minutes(packets: list[AttributedPacket]) -> list[ChannelMinute]:
                 sf=sf,
                 pkts=pkts,
                 uniq_hashes=uniq,
+                payload_bytes=sum(size * count for size, count in sizes),
+                payload_sizes=sizes,
                 snr_avg_x4=snr_avg,
                 snr_p50_x4=snr_p50,
                 snr_ge0_pct=ge0,

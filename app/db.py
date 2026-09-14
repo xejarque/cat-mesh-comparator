@@ -42,7 +42,7 @@ class DataQuality:
 
 
 SCHEMA_PATH = Path(__file__).resolve().parent.parent / "sql" / "schema.sql"
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 7
 SECONDS_PER_DAY = 86_400
 
 # Tablas derivadas cuya clave cambió en la v3. Se reconstruyen desde raw_packets,
@@ -57,6 +57,8 @@ ADDITIVE_COLUMNS: tuple[tuple[str, str, str], ...] = (
     ("raw_packets", "is_valid", "INTEGER"),
     ("observer_minute", "snr_p50_x4", "REAL"),
     ("observer_minute", "rssi_avg", "REAL"),
+    ("channel_minute", "payload_bytes", "INTEGER"),
+    ("channel_minute", "payload_sizes", "TEXT"),
 )
 
 
@@ -381,6 +383,8 @@ def replace_channel_minutes(
             row.sf,
             row.pkts,
             row.uniq_hashes,
+            row.payload_bytes,
+            ",".join(f"{size}:{count}" for size, count in row.payload_sizes) or None,
             row.snr_avg_x4,
             row.snr_p50_x4,
             row.snr_ge0_pct,
@@ -395,8 +399,9 @@ def replace_channel_minutes(
     conn.executemany(
         """INSERT OR REPLACE INTO channel_minute
            (minute_ts, channel_id, freq_mhz, bw_khz, sf, pkts, uniq_hashes,
-            snr_avg_x4, snr_p50_x4, snr_ge0_pct, rssi_avg, observers, crs)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            payload_bytes, payload_sizes, snr_avg_x4, snr_p50_x4, snr_ge0_pct,
+            rssi_avg, observers, crs)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         payload,
     )
     return len(payload)

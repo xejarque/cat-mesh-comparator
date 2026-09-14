@@ -135,6 +135,7 @@ app/
   aggregate.py      rollups por minuto                                  (puro)
   metrics.py        resumen por preset y ranking de limpieza            (puro)
   stats.py          media, mediana y versiones ponderadas
+  lora.py           tiempo de aire de LoRa: modelo, no medición         (puro)
   periods.py        regímenes de canal y comparación entre períodos      (puro)
   geo.py            distancia entre dos puntos
   health.py         ¿sigue vivo el colector?                             (puro)
@@ -148,7 +149,7 @@ app/
   templates/        Jinja2 (base + 6 páginas)
   static/app.css    sistema de diseño en tokens, sin framework ni build
 sql/schema.sql
-tests/              192 tests
+tests/              222 tests
 deploy/             Caddyfile, systemd, backup
 scripts/            captura de muestra (Fase 0) y chequeo de salud
 Dockerfile          imagen Alpine en dos etapas (~141 MB)
@@ -169,11 +170,11 @@ En producción va detrás de Caddy, que le pone TLS y la deja en `127.0.0.1:8000
 | `/` | Resumen de las últimas 24 h y estado del sistema |
 | `/vivo` | Feed de paquetes al llegar. Se consulta cada 2 s, sin SSE |
 | `/comparador` | El comparador: ventana, **desglose dimensional** y **agregación por receptor** |
-| `/comparar` | **Comparación aparcada**, en dos modos: simultáneo y por períodos |
+| `/comparar` | **Comparación aparcada**, en dos modos: simultáneo y por períodos, y el panel de **coste y beneficio de cambiar de SF** |
 | `/observadores` | Quién escucha, con qué configuración y qué ruido ve |
 | `/campana` | Qué canales cubre alguien y **cuáles están vacíos** |
 | `/calidad` | Las cuatro causas de paquete sin atribuir, por día |
-| `/metodologia` | Fórmulas y las seis trampas de lectura |
+| `/metodologia` | Fórmulas y las siete trampas de lectura |
 
 ### Por qué hace falta `/comparar` y no basta con `/comparador`
 
@@ -202,6 +203,18 @@ reglas:
 
 **Lo que hace falta para que esto sirva es mucho más barato de lo que parece: no hacen
 falta muchos receptores por canal, basta con UNO que vaya alternando.**
+
+**Por comarca** es la cuarta vista, y va **al revés**: en vez de una comarca en varios
+canales, compara **el mismo canal medido por varias comarcas**. Al revés se caía en el
+caso traicionero —misma frecuencia con distinto SF, donde cada receptor oyó a emisores
+distintos— y las métricas eran sobre todo inventario (cuántos receptores, cuántas
+recepciones), que no dice nada del canal.
+
+Ahora la tabla **compara de verdad**: elige una comarca de referencia —la que más
+receptores tiene, no la que sale mejor— y muestra la **diferencia** de cada una contra
+ella, con el signo delante. En ruido y ocupación, menos es mejor. Sigue sin controlar el
+receptor, así que orienta, no concluye: lo que controla es el canal, que es lo que se
+discute.
 
 **Modo por períodos.** Aquí el no solapamiento **es el diseño**: se compara una semana
 con otra. Lo que sustituye a la regla de solapamiento es el **control**: otro período en
@@ -292,6 +305,8 @@ enseñar una tabla.
 | Error rate | `Δ(recv_errors) / Δt` | `/status` |
 | SNR / RSSI | media, p50, % con SNR≥0 | `/packets` |
 | Tráfico | recepciones/h y **hash únicos**/h (transmisiones distintas) | `/packets` |
+| Bytes | longitud de la trama **en el aire** (`raw`), transmisiones distintas (una vez por hash) | `/packets` (**medido**) |
+| Tiempo de aire | fórmula de Semtech sobre la **mezcla real de tamaños**, a cada SF | **modelo**, no medición |
 | PDR entre observers | `|A∩B| / |A∪B|` sobre hashes, mismo **canal físico** y minuto | `/packets` |
 
 El ranking de limpieza es un índice compuesto **heurístico** (ruido 0.35, SNR 0.25,

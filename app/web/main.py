@@ -18,6 +18,8 @@ from app.query import (
     DIMENSION_LABELS,
     DIMENSIONS,
     channel_catalog,
+    channel_costs,
+    channel_regions,
     channel_series,
     channel_summaries,
     common_observers,
@@ -25,7 +27,6 @@ from app.query import (
     observer_rows,
     paired_observers,
     paired_pairs,
-    paired_regions,
     preset_summaries,
     quality_rows,
     recent_packets,
@@ -255,7 +256,8 @@ async def comparar(
             windows=PAIRED_WINDOWS,
             observers=paired_observers(conn, since, until),
             pairs=paired_pairs(conn, since, until),
-            regions=paired_regions(conn, since, until),
+            regions=channel_regions(conn, since, until),
+            costs=channel_costs(conn, since, until),
             generated_at=now,
         ),
     )
@@ -362,6 +364,15 @@ def _fmt_int(value: object) -> str:
     return "—" if value is None else f"{int(value):,}".replace(",", " ")
 
 
+def _fmt_signed(value: object, digits: int, suffix: str) -> str:
+    """Diferencia con el signo delante: comparar es ver el + y el −, no el valor."""
+    if value is None:
+        return "—"
+    if isinstance(value, (int, float)):
+        return f"{value:+,.{digits}f}{suffix}".replace(",", " ")
+    return str(value)
+
+
 def _fmt_ts(value: object) -> str:
     if not value:
         return "—"
@@ -379,6 +390,17 @@ def _fmt_ago(value: object) -> str:
     if seconds < 172800:
         return f"hace {seconds // 3600} h"
     return f"hace {seconds // 86400} d"
+
+
+def _fmt_bytes(value: object) -> str:
+    """Bytes con unidad legible: 32 B, 1,5 kB, 2,3 MB."""
+    if value is None:
+        return "—"
+    amount = float(value)
+    for suffix, scale in (("MB", 1024 * 1024), ("kB", 1024)):
+        if abs(amount) >= scale:
+            return f"{amount / scale:,.1f} {suffix}".replace(",", " ")
+    return f"{amount:,.0f} B".replace(",", " ")
 
 
 def _fmt_metric(value: object, unit: str) -> str:
@@ -401,6 +423,10 @@ templates.env.filters.update(
     snr=lambda v: _fmt(v, 1, " dB"),
     pct=lambda v: _fmt(v, 1, " %"),
     num=_fmt_int,
+    bsize=_fmt_bytes,
+    ratio=lambda v: _fmt(v, 2, "×"),
+    ddb=lambda v: _fmt_signed(v, 1, " dB"),
+    dpct=lambda v: _fmt_signed(v, 1, " %"),
     ts=_fmt_ts,
     ago=_fmt_ago,
     metric=_fmt_metric,

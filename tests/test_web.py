@@ -90,6 +90,36 @@ def test_unknown_mode_falls_back_to_simultaneous(client):
     assert "comparación válida" in response.text or "Hoy no hay nada que comparar" in response.text
 
 
+def test_comparar_shows_the_cost_and_benefit_panel(client):
+    response = client.get("/comparar")
+
+    assert "Coste y beneficio de cambiar de SF" in response.text
+    # El encabezado deja claro que una mitad es medida y la otra modelada.
+    assert "el tiempo de aire se calcula" in response.text
+    assert "Aire del canal por hora" in response.text
+    # La mezcla real, no una media inventada.
+    assert "Mezcla real" in response.text
+    assert "SF7" in response.text
+
+
+def test_comparar_says_which_channels_it_could_not_compare(client):
+    # Con un solo canal y una sola comarca no hay comparación posible, y la página debe
+    # decir cuál queda fuera y por qué en vez de omitir la sección en silencio.
+    response = client.get("/comparar")
+
+    assert "Por comarca" in response.text
+    assert "Canales que no se pueden comparar entre comarcas" in response.text
+    assert "solo BAR" in response.text
+
+
+def test_metodologia_documents_the_airtime_model(client):
+    response = client.get("/metodologia")
+
+    assert "El coste de cambiar de SF" in response.text
+    assert "modelo de primer orden" in response.text
+    assert "Siete trampas" in response.text
+
+
 def test_campana_includes_the_campaign_protocol(client):
     response = client.get("/campana")
 

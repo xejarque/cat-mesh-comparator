@@ -6,6 +6,8 @@ from app.db import connect, init_db, insert_packets, insert_status
 from app.models import PresetKey
 from app.query import (
     channel_catalog,
+    channel_costs,
+    channel_regions,
     channel_series,
     channel_summaries,
     common_observers,
@@ -13,7 +15,6 @@ from app.query import (
     observer_rows,
     paired_observers,
     paired_pairs,
-    paired_regions,
     preset_summaries,
     quality_rows,
     recent_packets,
@@ -269,12 +270,74 @@ def test_paired_subject_does_not_flag_a_real_frequency_change(conn):
     assert subjects[0].only_sf_changes is False
 
 
-def test_paired_regions_group_by_iata(conn):
-    _alternating(conn, "OBS1", ["869.618,62.5,7,6", "869.432,62.5,7,6"])
+def test_channel_regions_compare_regions_on_the_same_channel(conn):
+    # Mismo canal, dos comarcas: es la comparación que sí tiene sentido.
+    fill_observer_minute(
+        conn, "OBS_BCN", SLOT_1, "2026-09-14T10:00:00Z", 10, noise=-104.0, iata="BCN"
+    )
+    fill_observer_minute(
+        conn, "OBS_GRO", SLOT_1, "2026-09-14T10:00:00Z", 10, noise=-97.0, iata="GRO"
+    )
 
-    subjects = paired_regions(conn, since_ts=0)
+    channels = channel_regions(conn, since_ts=0)
 
-    assert [subject.subject for subject in subjects] == ["BAR"]
+    assert len(channels) == 1
+    group = channels[0]
+    assert group.channel_label == "869.432 MHz · BW62.5 · SF7"
+    assert group.comparable is True
+    # A igualdad de receptores y minutos, la referencia es la primera por nombre.
+    assert group.reference == "BCN"
+
+    # Lo que convierte la tabla en una comparación: la diferencia contra la referencia.
+    reference = next(item for item in group.regions if item.is_reference)
+    other = next(item for item in group.regions if not item.is_reference)
+    assert reference.noise_delta_db == pytest.approx(0.0)
+    assert other.noise_delta_db == pytest.approx(7.0)
+
+
+def test_channel_regions_prefers_the_region_with_more_receivers_as_reference(conn):
+    fill_observer_minute(
+        conn, "OBS_BCN", SLOT_1, "2026-09-14T10:00:00Z", 10, iata="BCN"
+    )
+    for index in range(3):
+        fill_observer_minute(
+            conn,
+            f"OBS_GRO{index}",
+            SLOT_1,
+            "2026-09-14T10:00:00Z",
+            10,
+            iata="GRO",
+        )
+
+    group = channel_regions(conn, since_ts=0)[0]
+
+    assert group.reference == "GRO"
+    assert group.regions[0].observers == 3
+
+
+def test_channel_regions_needs_two_regions_to_compare(conn):
+    fill_observer_minute(
+        conn, "OBS_BCN", SLOT_1, "2026-09-14T10:00:00Z", 10, iata="BCN"
+    )
+
+    group = channel_regions(conn, since_ts=0)[0]
+
+    assert group.comparable is False
+    assert len(group.regions) == 1
+
+
+def test_channel_regions_without_temporal_overlap_are_not_comparable(conn):
+    fill_observer_minute(
+        conn, "OBS_BCN", SLOT_1, "2026-09-14T10:00:00Z", 10, iata="BCN"
+    )
+    fill_observer_minute(
+        conn, "OBS_GRO", SLOT_1, "2026-09-14T12:00:00Z", 10, iata="GRO"
+    )
+
+    group = channel_regions(conn, since_ts=0)[0]
+
+    assert group.overlap_seconds == 0
+    assert group.comparable is False
 
 
 def test_per_receiver_aggregation_is_not_dominated_by_volume(conn):
@@ -402,6 +465,79 @@ def test_channel_series_returns_points_per_group(conn):
     assert list(series) == ["869.618 MHz · BW62.5 · SF7"]
     points = series["869.618 MHz · BW62.5 · SF7"]
     assert points == [(epoch("2026-09-14T10:00:00Z"), 3)]
+
+
+def test_channel_costs_count_on_air_bytes_once_per_transmission(conn):
+    _seed(conn)
+
+    costs = channel_costs(conn, since_ts=0)
+
+    assert len(costs) == 1
+    cost = costs[0]
+    assert cost.channel_label == "869.618 MHz · BW62.5 · SF7"
+    # `aa` la oyen dos receptores pero es UNA transmisión. El raw de prueba son 3 B.
+    assert cost.transmissions == 2
+    assert cost.sizes == ((3, 2),)
+    assert cost.payload_bytes_total == 6
+    assert cost.median_size_bytes == 3
+    # Una sola fila de un minuto: la tasa se proyecta a la hora.
+    assert cost.transmissions_per_h == pytest.approx(120.0)
+    assert cost.snr_p50_db == pytest.approx(8.0)
+    # El SF del canal es el eje: su fila es la referencia 1,00×.
+    assert cost.can_model is True
+    baseline = next(item for item in cost.projections if item.sf == 7)
+    assert baseline.factor_vs_current == pytest.approx(1.0)
+    assert baseline.margin_db == pytest.approx(8.0 - (-7.5))
+
+
+def test_channel_costs_model_the_real_size_mix(conn):
+    # Tráfico bimodal: 22 B de control y 124 B de advert. Se modela la mezcla, no su
+    # media, porque la media cae en un valle y no describe ningún paquete real.
+    fill_channel_minute(
+        conn,
+        SLOT_1,
+        "2026-09-14T10:00:00Z",
+        6,
+        uniq_hashes=10,
+        sizes={22: 7, 124: 3},
+        snr_p50_x4=40.0,
+    )
+
+    cost = channel_costs(conn, since_ts=0)[0]
+
+    assert cost.sizes == ((22, 42), (124, 18))
+    assert cost.payload_bytes_total == 6 * (22 * 7 + 124 * 3)
+    assert cost.median_size_bytes == 22
+    assert cost.top_sizes[0] == (22, 42)
+    # La media queda entre los dos picos: no es ninguno de los tamaños que hay.
+    media = cost.payload_bytes_total / cost.transmissions
+    assert 22 < media < 124
+
+
+def test_channel_costs_without_a_mix_cannot_model_the_air(conn):
+    # Sin mezcla de tamaños no hay aire que proyectar: mejor decirlo que inventar ceros.
+    fill_channel_minute(conn, SLOT_1, "2026-09-14T10:00:00Z", 3)
+
+    costs = channel_costs(conn, since_ts=0)
+
+    assert len(costs) == 1
+    assert costs[0].can_model is False
+    assert costs[0].projections == ()
+
+
+def test_channel_costs_group_by_physical_channel(conn):
+    fill_channel_minute(
+        conn, SLOT_1, "2026-09-14T10:00:00Z", 6, uniq_hashes=10, sizes={32: 10}
+    )
+    fill_channel_minute(
+        conn, CR6, "2026-09-14T11:00:00Z", 6, uniq_hashes=10, sizes={32: 10}
+    )
+
+    costs = channel_costs(conn, since_ts=0)
+
+    assert len(costs) == 2
+    assert all(cost.transmissions_per_h == pytest.approx(600.0) for cost in costs)
+    assert all(cost.payload_bytes_total == 6 * 32 * 10 for cost in costs)
 
 
 def test_validate_group_by_rejects_unknown_dimensions():

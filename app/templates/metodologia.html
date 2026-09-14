@@ -74,6 +74,18 @@
           minuto.</td>
         <td><code>/packets</code></td>
       </tr>
+      <tr>
+        <td class="strong">Bytes</td>
+        <td>Longitud de la trama <strong>en el aire</strong> (<code>raw</code>) de las
+          transmisiones <strong>distintas</strong> (una vez por hash).</td>
+        <td><code>/packets</code>. <strong>Medido.</strong></td>
+      </tr>
+      <tr>
+        <td class="strong">Tiempo de aire</td>
+        <td>Fórmula de Semtech sobre la <strong>mezcla real de tamaños</strong>, a cada
+          SF de la escalera.</td>
+        <td><strong>Modelo</strong>, no medición: el SF de emisión no se publica.</td>
+      </tr>
     </tbody>
   </table>
 </div>
@@ -83,7 +95,58 @@
   el observador para ruido, ocupación y errores.
 </p>
 
-<h2>Seis trampas que hay que tener presentes</h2>
+<h2>El coste de cambiar de SF: bytes medidos, aire modelado</h2>
+<p class="prose">
+  Los <strong>bytes</strong> son una medición: se suma la longitud de la trama
+  <strong>en el aire</strong> (<code>raw</code>) de las transmisiones
+  <strong>distintas</strong>. La deduplicación por hash importa —una transmisión que
+  oyen ocho receptores aparece ocho veces en el crudo—, y sin ella el tráfico se
+  multiplicaría por el número de receptores.
+</p>
+<p class="prose">
+  Se usa la trama en el aire y <strong>no</strong> el <code>payload_len</code> del
+  broker, que es el payload de <em>aplicación</em>: en un Ack de 6 B, la trama en el
+  aire llega a 20-24 B, porque la cabecera y la ruta pesan más que el mensaje.
+</p>
+<p class="prose">
+  Y se modela la <strong>mezcla real de tamaños</strong>, no un paquete medio. El
+  tráfico de una malla es <strong>bimodal</strong> —control pequeño por un lado,
+  adverts grandes por otro—, así que su media cae en un valle y no describe ningún
+  paquete que exista. Por eso el panel enseña la mediana y la mezcla, y el aire se
+  calcula tamaño a tamaño.
+</p>
+<p class="prose">
+  El <strong>tiempo de aire</strong> es un modelo, no una medición, porque el broker
+  solo publica con qué configuración <em>escucha</em> cada receptor, nunca con cuál se
+  emitió. (Matiz: como SF y ancho <strong>tienen</strong> que coincidir para demodular,
+  el SF del canal sí es el de emisión; lo que no se conoce es la CR con la que se
+  emitió.) Se calcula con la fórmula de Semtech (AN1200.13) sobre esa mezcla:
+</p>
+<p class="prose">
+  <code>T_sym = 2^SF / BW</code> ·
+  <code>T_preamble = (n_preamble + 4,25) · T_sym</code> ·
+  <code>ToA = T_preamble + n_payload · T_sym</code>
+</p>
+<p class="prose">
+  El caso de «cambiar de SF» mantiene el ancho y recorre <strong>SF6…SF12</strong>
+  —SF6 es válido y es el más rápido y el menos sensible—. Cada paso de SF dobla
+  aproximadamente el aire y baja unos <strong>2,5 dB</strong> el umbral de
+  demodulación: eso es lo que se gana y lo que se paga.
+</p>
+<p class="prose">
+  El <strong>margen</strong> que se muestra es un modelo de primer orden:
+  <code>SNR medido − umbral del SF</code>. Subir de SF no cambia la señal que llega,
+  pero sí baja el umbral, así que el enlace cierra con más holgura. Es una estimación
+  de sensibilidad, no un enlace medido, y por eso va etiquetada como modelo.
+</p>
+<p class="prose">
+  Ojo con la confusión fácil: la <strong>ocupación</strong> que ya existía
+  (<code>chan_util_pct</code>, derivada de <code>tx_air_secs</code> y
+  <code>rx_air_secs</code>) <strong>sí</strong> es medida, y es otra cosa: mide cuánto
+  estuvo ocupado el receptor, no cuánto costaría emitir un payload a otro SF.
+</p>
+
+<h2>Siete trampas que hay que tener presentes</h2>
 
 <h3>1. La interferencia no aparece como paquetes</h3>
 <p class="prose">
@@ -126,6 +189,14 @@
   El índice de limpieza combina ruido (0,35), SNR (0,25), errores (0,25) y ocupación
   (0,15) con pesos elegidos a mano. Es una ayuda para ordenar, no un veredicto: en las
   tablas van siempre los valores crudos al lado para poder discrepar.
+</p>
+
+<h3>7. El tiempo de aire es modelado, no medido</h3>
+<p class="prose">
+  El broker no publica con qué SF se <strong>emitió</strong> una transmisión, solo con
+  cuál <strong>escucha</strong> cada receptor. Así que el aire de la escalera SF7…SF12
+  es un cálculo sobre el payload observado, no una observación. Y el margen de
+  sensibilidad es de primer orden. Sirve para decidir, no para certificar.
 </p>
 
 <h2>Sobre el hash</h2>

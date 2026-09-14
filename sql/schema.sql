@@ -117,6 +117,14 @@ CREATE TABLE IF NOT EXISTS channel_minute (
     sf          INTEGER NOT NULL,
     pkts        INTEGER NOT NULL,
     uniq_hashes INTEGER NOT NULL,
+    -- Bytes **en el aire** (la trama LoRa, cabecera y ruta incluidas) de las
+    -- transmisiones DISTINTAS: una oída por ocho receptores cuenta una vez, igual que
+    -- uniq_hashes. Mide tráfico, no recepciones.
+    payload_bytes INTEGER,
+    -- Mezcla de tamaños, "bytes:transmisiones,...". El tráfico es bimodal (control
+    -- pequeño y adverts grandes) y su media no describe ningún paquete real, así que
+    -- el tiempo de aire se calcula sobre la mezcla, no sobre un tamaño medio.
+    payload_sizes TEXT,
     snr_avg_x4  REAL,
     snr_p50_x4  REAL,
     snr_ge0_pct REAL,

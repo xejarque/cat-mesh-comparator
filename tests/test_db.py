@@ -227,6 +227,80 @@ def test_init_db_adds_the_new_columns_to_an_existing_v1_database(tmp_path):
     assert version == SCHEMA_VERSION
 
 
+def test_init_db_adds_the_byte_columns_to_an_existing_channel_minute(tmp_path):
+    import sqlite3
+
+    # Una base anterior no trae la columna de bytes en el rollup de canal.
+    path = tmp_path / "old-channel.db"
+    legacy = sqlite3.connect(path)
+    legacy.executescript(
+        """
+        CREATE TABLE channel_minute (
+            minute_ts   INTEGER NOT NULL,
+            channel_id  TEXT    NOT NULL,
+            freq_mhz    REAL    NOT NULL,
+            bw_khz      REAL    NOT NULL,
+            sf          INTEGER NOT NULL,
+            pkts        INTEGER NOT NULL,
+            uniq_hashes INTEGER NOT NULL,
+            snr_avg_x4  REAL,
+            snr_p50_x4  REAL,
+            snr_ge0_pct REAL,
+            rssi_avg    REAL,
+            observers   INTEGER NOT NULL,
+            crs         TEXT,
+            PRIMARY KEY (minute_ts, channel_id)
+        );
+        """
+    )
+    legacy.close()
+
+    connection = connect(path)
+    init_db(connection)
+    columns = {
+        row["name"] for row in connection.execute("PRAGMA table_info(channel_minute)")
+    }
+    version = connection.execute("PRAGMA user_version").fetchone()[0]
+    connection.close()
+
+    assert {"payload_bytes", "payload_sizes"} <= columns
+    assert version == SCHEMA_VERSION
+
+
+def test_channel_minute_roundtrips_the_size_mix(conn):
+    from app.aggregate import ChannelMinute
+    from app.db import replace_channel_minutes
+
+    written = replace_channel_minutes(
+        conn,
+        [
+            ChannelMinute(
+                minute_ts=epoch("2026-09-14T10:00:00Z"),
+                freq_mhz=869.618,
+                bw_khz=62.5,
+                sf=7,
+                pkts=3,
+                uniq_hashes=2,
+                payload_bytes=80,
+                payload_sizes=((40, 2),),
+                snr_avg_x4=40.0,
+                snr_p50_x4=32.0,
+                snr_ge0_pct=100.0,
+                rssi_avg=-70.0,
+                observers=2,
+                crs=(6, 8),
+            )
+        ],
+    )
+
+    assert written == 1
+    row = conn.execute(
+        "SELECT payload_bytes, payload_sizes FROM channel_minute"
+    ).fetchone()
+    assert row["payload_bytes"] == 80
+    assert row["payload_sizes"] == "40:2"
+
+
 def test_migration_to_v3_rebuilds_pair_minute_by_channel(tmp_path):
     import sqlite3
 
