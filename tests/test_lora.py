@@ -132,6 +132,28 @@ def test_projection_reports_airtime_as_a_share_of_the_observed_time():
     assert projections[7].seconds_per_hour == pytest.approx(air)
 
 
+def test_projection_reports_the_mean_time_per_transmission():
+    # El número que hace tangible el coste: lo que tarda **un** paquete, promediado
+    # sobre la mezcla real y no sobre un paquete inventado.
+    sizes = {22: 3, 124: 1}
+    projections = {item.sf: item for item in _project(sizes=sizes)}
+
+    esperado_ms = 1000 * airtime_s(sizes, 7, 62.5, 6) / sum(sizes.values())
+    assert projections[7].mean_toa_ms == pytest.approx(esperado_ms)
+
+
+def test_the_mean_time_per_packet_is_not_the_time_of_the_mean_packet():
+    # Por esto no sirve la media de tamaños: el tiempo medio de la mezcla no es el
+    # tiempo de un paquete del tamaño medio.
+    sizes = {22: 3, 124: 1}
+    projections = {item.sf: item for item in _project(sizes=sizes)}
+
+    media = sum(size * count for size, count in sizes.items()) / sum(sizes.values())
+    assert projections[7].mean_toa_ms != pytest.approx(
+        1000 * time_on_air_s(round(media), 7, 62.5, 6)
+    )
+
+
 def test_projection_margin_is_measured_snr_minus_the_demod_threshold():
     projections = {item.sf: item for item in _project(snr_p50_db=5.0)}
 

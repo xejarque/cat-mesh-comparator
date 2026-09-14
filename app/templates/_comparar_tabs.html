@@ -1,15 +1,13 @@
-<nav class="modes" aria-label="Modo de comparación">
+<nav class="modes" aria-label="{{ _('Modo de comparación') }}">
   <a href="/comparar?mode=simultaneo"
-     {% if mode == "simultaneo" %}aria-current="page"{% endif %}>Simultáneo</a>
+     {% if mode == "simultaneo" %}aria-current="page"{% endif %}>{{ _("Simultáneo") }}</a>
   <a href="/comparar?mode=periodos"
-     {% if mode == "periodos" %}aria-current="page"{% endif %}>Por períodos</a>
+     {% if mode == "periodos" %}aria-current="page"{% endif %}>{{ _("Por períodos") }}</a>
 </nav>
 <p class="stamp">
   {% if mode == "simultaneo" %}
-    El mismo receptor o pareja en dos canales <strong>a la vez</strong>. Es la medida
-    más limpia, pero solo cubre los nodos que se mueven.
+    {{ _("El mismo receptor o pareja en dos canales <strong>a la vez</strong>. Es la medida más limpia, pero solo cubre los nodos que se mueven.") }}
   {% else %}
-    La red entera en un canal contra la red entera en otro. Responde la pregunta que
-    importa, pero arrastra el efecto del tiempo.
+    {{ _("La red entera en un canal contra la red entera en otro. Responde la pregunta que importa, pero arrastra el efecto del tiempo.") }}
   {% endif %}
 </p>

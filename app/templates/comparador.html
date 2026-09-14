@@ -1,17 +1,16 @@
 {% extends "base.html" %}
-{% block title %}Comparador · Observatorio MeshCore 868{% endblock %}
+{% block title %}{{ _("Comparador") }} · Meshcore Preset Analyzer{% endblock %}
 
 {% block content %}
-<h1>Comparador</h1>
+<h1>{{ _("Comparador") }}</h1>
 <p class="lede">
-  Elige la ventana temporal y cómo quieres desglosar. Las dimensiones son
-  <strong>frecuencia</strong>, <strong>ancho de banda</strong> y <strong>SF</strong>:
-  son las que parten de verdad el tráfico.
+  {{ _("Elige la ventana temporal y cómo quieres desglosar. Las dimensiones son <strong>frecuencia</strong>, <strong>ancho de banda</strong> y <strong>SF</strong>: son las que parten de verdad el tráfico.") }}
 </p>
 
 <form class="controls" method="get" action="/comparador">
+  <input type="hidden" name="lang" value="{{ lang }}">
   <label class="field">
-    <span>Ventana</span>
+    <span>{{ _("Ventana") }}</span>
     <select name="window">
       {% for option in windows %}
       <option value="{{ option }}"{% if option == window %} selected{% endif %}>{{ option }}</option>
@@ -20,7 +19,7 @@
   </label>
 
   <div class="field">
-    <span>Desglosar por</span>
+    <span>{{ _("Desglosar por") }}</span>
     <div class="dims">
       {% for dim in dims_all %}
       <label>
@@ -33,51 +32,45 @@
   </div>
 
   <label class="field">
-    <span>Agregar</span>
+    <span>{{ _("Agregar") }}</span>
     <select name="mode">
       <option value="recepciones"{% if mode == "recepciones" %} selected{% endif %}>
-        Todas las recepciones
+        {{ _("Todas las recepciones") }}
       </option>
       <option value="receptores"{% if mode == "receptores" %} selected{% endif %}>
-        Por receptor
+        {{ _("Por receptor") }}
       </option>
     </select>
   </label>
 
   {% if mode == "receptores" %}
   <div class="field">
-    <span>Solo receptores presentes en todos los grupos</span>
+    <span>{{ _("Solo receptores presentes en todos los grupos") }}</span>
     <div class="dims">
       <label>
         <input type="checkbox" name="common" value="1"{% if only_common %} checked{% endif %}>
-        Comparar solo los comunes ({{ common_count }} de {{ total_count }})
+        {{ _("Comparar solo los comunes ({common} de {total})", common=common_count, total=total_count) }}
       </label>
     </div>
   </div>
   {% endif %}
 
-  <button class="btn" type="submit">Aplicar</button>
+  <button class="btn" type="submit">{{ _("Aplicar") }}</button>
   <p class="stamp" style="margin:0;">
-    Datos hasta {{ generated_at | ts }}
+    {{ _("Datos hasta {ts}", ts=(generated_at | ts)) }}
   </p>
 </form>
 
 {% if mode == "receptores" %}
 <div class="note">
   <p>
-    <strong>Cada receptor cuenta una vez</strong>, oiga mucho o poco. Con «todas las
-    recepciones» un nodo charlatán pesa más que los demás, y uno con malas lecturas
-    arrastra la media de todo el canal. Aquí un nodo así mueve una posición, y el
-    rango que va al lado lo deja a la vista en vez de esconderlo.
+    {{ _("<strong>Cada receptor cuenta una vez</strong>, oiga mucho o poco. Con «todas las recepciones» un nodo charlatán pesa más que los demás, y uno con malas lecturas arrastra la media de todo el canal. Aquí un nodo así mueve una posición, y el rango que va al lado lo deja a la vista en vez de esconderlo.") }}
   </p>
   {% if only_common %}
   <p>
-    Y solo se cuentan los <strong>{{ common_count }}</strong> receptores que aparecen
-    en <em>todos</em> los grupos comparados, de {{ total_count }}. Eso convierte la
-    comparación en apareada: mismos nodos en los dos lados.
+    {{ _("Y solo se cuentan los <strong>{common}</strong> receptores que aparecen en <em>todos</em> los grupos comparados, de {total}. Eso convierte la comparación en apareada: mismos nodos en los dos lados.", common=common_count, total=total_count) }}
     {% if common_count == 0 %}
-      Ahora mismo <strong>no hay ninguno</strong>: cada grupo lo escuchan receptores
-      distintos, así que no existe comparación apareada posible.
+      {{ _("Ahora mismo <strong>no hay ninguno</strong>: cada grupo lo escuchan receptores distintos, así que no existe comparación apareada posible.") }}
     {% endif %}
   </p>
   {% endif %}
@@ -87,29 +80,26 @@
 {% if mixes_channels %}
 <div class="note warn">
   <p>
-    Estás agrupando sin <strong>frecuencia</strong> o sin <strong>ancho</strong>. El
-    piso de ruido y la ocupación se miden por receptor y dependen de ambos, así que
-    estos dos valores son un promedio de canales distintos. El tráfico, el SNR y el
-    PDR sí se pueden sumar con seguridad: una transmisión ocupa un solo canal físico.
+    {{ _("Estás agrupando sin <strong>frecuencia</strong> o sin <strong>ancho</strong>. El piso de ruido y la ocupación se miden por receptor y dependen de ambos, así que estos dos valores son un promedio de canales distintos. El tráfico, el SNR y el PDR sí se pueden sumar con seguridad: una transmisión ocupa un solo canal físico.") }}
   </p>
 </div>
 {% endif %}
 
 {% if summaries %}
-<h2>Resumen por {{ group_by | map('lower') | join(' + ') }}</h2>
+<h2>{{ _("Resumen por") }} {{ group_by | map('lower') | join(' + ') }}</h2>
 <div class="table-scroll">
   <table>
     {% if mode == "receptores" %}
     <thead>
       <tr>
-        <th>Grupo</th>
-        <th>Receptores</th>
-        <th>SNR mediana <span class="muted">(rango)</span></th>
-        <th>Ruido de fondo <span class="muted">(rango)</span></th>
-        <th>Ocupación mediana</th>
-        <th>Errores/h mediana</th>
-        <th>Recepciones mediana</th>
-        <th>PDR mediana</th>
+        <th>{{ _("Grupo") }}</th>
+        <th>{{ _("Receptores") }}</th>
+        <th>{{ _("SNR mediana") }} <span class="muted">{{ _("(rango)") }}</span></th>
+        <th>{{ _("Ruido de fondo") }} <span class="muted">{{ _("(rango)") }}</span></th>
+        <th>{{ _("Ocupación mediana") }}</th>
+        <th>{{ _("Errores/h mediana") }}</th>
+        <th>{{ _("Recepciones mediana") }}</th>
+        <th>{{ _("PDR mediana") }}</th>
       </tr>
     </thead>
     <tbody>
@@ -140,17 +130,17 @@
     {% else %}
     <thead>
       <tr>
-        <th>Grupo</th>
-        <th>Transmisiones</th>
-        <th>Recepciones</th>
-        <th>SNR mediana</th>
-        <th>SNR ≥ 0</th>
-        <th>RSSI medio</th>
-        <th>Ruido de fondo</th>
-        <th>Ocupación</th>
-        <th>Errores/h</th>
-        <th>PDR mediana</th>
-        <th>Observadores</th>
+        <th>{{ _("Grupo") }}</th>
+        <th>{{ _("Transmisiones") }}</th>
+        <th>{{ _("Recepciones") }}</th>
+        <th>{{ _("SNR mediana") }}</th>
+        <th>{{ _("SNR ≥ 0") }}</th>
+        <th>{{ _("RSSI medio") }}</th>
+        <th>{{ _("Ruido de fondo") }}</th>
+        <th>{{ _("Ocupación") }}</th>
+        <th>{{ _("Errores/h") }}</th>
+        <th>{{ _("PDR mediana") }}</th>
+        <th>{{ _("Observadores") }}</th>
       </tr>
     </thead>
     <tbody>
@@ -174,33 +164,29 @@
   </table>
 </div>
 
-<h2>Transmisiones distintas por grupo</h2>
+<h2>{{ _("Transmisiones distintas por grupo") }}</h2>
 <p class="stamp">
-  Una transmisión cuenta una vez aunque la oigan ocho receptores. Es la medida de
-  cuánto tráfico hay, no de cuántas veces se ha oído.
+  {{ _("Una transmisión cuenta una vez aunque la oigan ocho receptores. Es la medida de cuánto tráfico hay, no de cuántas veces se ha oído.") }}
 </p>
-<canvas id="bars" height="120" aria-label="Transmisiones distintas por grupo"></canvas>
+<canvas id="bars" height="120" aria-label="{{ _('Transmisiones distintas por grupo') }}"></canvas>
 
-<h2>Recepciones a lo largo del tiempo</h2>
-<canvas id="lines" height="120" aria-label="Recepciones por minuto y grupo"></canvas>
+<h2>{{ _("Recepciones a lo largo del tiempo") }}</h2>
+<canvas id="lines" height="120" aria-label="{{ _('Recepciones por minuto y grupo') }}"></canvas>
 
-<h2>Por configuración exacta de receptor</h2>
+<h2>{{ _("Por configuración exacta de receptor") }}</h2>
 <p class="stamp">
-  Aquí sí se separa la CR, porque cada fila es lo que ve un receptor con su
-  configuración concreta. Los totales de esta tabla <strong>no</strong> se deben sumar
-  para hablar de tráfico: contarían dos veces cada paquete oído por receptores de CR
-  distinta.
+  {{ _("Aquí sí se separa la CR, porque cada fila es lo que ve un receptor con su configuración concreta. Los totales de esta tabla <strong>no</strong> se deben sumar para hablar de tráfico: contarían dos veces cada paquete oído por receptores de CR distinta.") }}
 </p>
 <div class="table-scroll">
   <table>
     <thead>
       <tr>
-        <th>Preset</th>
-        <th>Recepciones</th>
-        <th>Transmisiones</th>
-        <th>SNR mediana</th>
-        <th>Ruido de fondo</th>
-        <th>PDR mediana</th>
+        <th>{{ _("Preset") }}</th>
+        <th>{{ _("Recepciones") }}</th>
+        <th>{{ _("Transmisiones") }}</th>
+        <th>{{ _("SNR mediana") }}</th>
+        <th>{{ _("Ruido de fondo") }}</th>
+        <th>{{ _("PDR mediana") }}</th>
       </tr>
     </thead>
     <tbody>
@@ -220,11 +206,9 @@
 
 {% else %}
 <div class="empty-state">
-  <strong>Sin datos en esta ventana</strong>
-  Ningún receptor ha oído nada con esta combinación de dimensiones en el periodo
-  elegido. Prueba una ventana más amplia, o mira
-  <a href="/campana">qué canales no cubre nadie</a>: una combinación que no escucha
-  nadie no se puede comparar con nada.
+  <strong>{{ _("Sin datos en esta ventana") }}</strong>
+  {{ _("Ningún receptor ha oído nada con esta combinación de dimensiones en el periodo elegido. Prueba una ventana más amplia, o mira") }}
+  <a href="/campana">{{ _("qué canales no cubre nadie") }}</a>{{ _(": una combinación que no escucha nadie no se puede comparar con nada.") }}
 </div>
 {% endif %}
 {% endblock %}

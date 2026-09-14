@@ -1,126 +1,94 @@
 {% extends "base.html" %}
-{% block title %}Metodología · Observatorio MeshCore 868{% endblock %}
+{% block title %}{{ _("Metodología") }} · Meshcore Preset Analyzer{% endblock %}
 
 {% block content %}
-<h1>Metodología</h1>
+<h1>{{ _("Metodología") }}</h1>
 <p class="lede">
-  De dónde sale cada número, qué se puede sumar y qué no, y las trampas que hacen que
-  una lectura ingenua de las tablas lleve a conclusiones falsas.
+  {{ _("De dónde sale cada número, qué se puede sumar y qué no, y las trampas que hacen que una lectura ingenua de las tablas lleve a conclusiones falsas.") }}
 </p>
 
-<h2>El canal físico es la unidad</h2>
+<h2>{{ _("El canal físico es la unidad") }}</h2>
 <p class="prose">
-  Un <strong>canal físico</strong> es <code>(frecuencia, ancho, SF)</code>. La
-  <strong>CR no entra</strong>, y no es un descuido: la tasa de codificación viaja en
-  la cabecera LoRa, así que dos receptores con CR distinta sobre la misma frecuencia y
-  SF decodifican exactamente la misma transmisión.
+  {{ _("Un <strong>canal físico</strong> es <code>(frecuencia, ancho, SF)</code>. La <strong>CR no entra</strong>, y no es un descuido: la tasa de codificación viaja en la cabecera LoRa, así que dos receptores con CR distinta sobre la misma frecuencia y SF decodifican exactamente la misma transmisión.") }}
 </p>
 <p class="prose">
-  Medido sobre este broker: <strong>8 receptores con 2 CR distintas</strong> oyendo el
-  mismo hash dentro de un solo canal físico, y <strong>0 hashes</strong> repartidos
-  entre dos canales. Sumar por configuración de receptor inflaba las transmisiones
-  distintas un <strong>30%</strong> (74 frente a 57 en la primera medición).
+  {{ _("Medido sobre este broker: <strong>8 receptores con 2 CR distintas</strong> oyendo el mismo hash dentro de un solo canal físico, y <strong>0 hashes</strong> repartidos entre dos canales. Sumar por configuración de receptor inflaba las transmisiones distintas un <strong>30%</strong> (74 frente a 57 en la primera medición).") }}
 </p>
 <p class="prose">
-  Además, el decoder <strong>no expone</strong> la CR con la que se emitió un paquete:
-  el <code>raw</code> empieza después de la cabecera. La CR solo se conoce como
-  configuración del receptor, que es lo que publica <code>/status</code>.
+  {{ _("Además, el decoder <strong>no expone</strong> la CR con la que se emitió un paquete: el <code>raw</code> empieza después de la cabecera. La CR solo se conoce como configuración del receptor, que es lo que publica <code>/status</code>.") }}
 </p>
 
-<h2>Qué se mide, y con qué</h2>
+<h2>{{ _("Qué se mide, y con qué") }}</h2>
 <div class="table-scroll">
   <table class="plain">
     <thead>
-      <tr><th>Métrica</th><th>Cómo</th><th>Fuente</th></tr>
+      <tr><th>{{ _("Métrica") }}</th><th>{{ _("Cómo") }}</th><th>{{ _("Fuente") }}</th></tr>
     </thead>
     <tbody>
       <tr>
-        <td class="strong">Ruido de fondo</td>
-        <td>Media de <code>noise_floor</code> del receptor en la ventana.</td>
-        <td><code>/status</code>. Lo muestrea el firmware: media de 64 lecturas de RSSI
-          tomadas en silencio, recalculada cada ~2 s.</td>
+        <td class="strong">{{ _("Ruido de fondo") }}</td>
+        <td>{{ _("Media de <code>noise_floor</code> del receptor en la ventana.") }}</td>
+        <td>{{ _("<code>/status</code>. Lo muestrea el firmware: media de 64 lecturas de RSSI tomadas en silencio, recalculada cada ~2 s.") }}</td>
       </tr>
       <tr>
-        <td class="strong">Ocupación</td>
-        <td><code>Δ(tx_air + rx_air) / Δt × 100</code></td>
-        <td><code>/status</code>. Es <em>derivada</em>: el firmware no la calcula.</td>
+        <td class="strong">{{ _("Ocupación") }}</td>
+        <td>{{ _("<code>Δ(tx_air + rx_air) / Δt × 100</code>") }}</td>
+        <td>{{ _("<code>/status</code>. Es <em>derivada</em>: el firmware no la calcula.") }}</td>
       </tr>
       <tr>
-        <td class="strong">Errores</td>
-        <td><code>Δ(recv_errors) / Δt</code></td>
-        <td><code>/status</code>. Es un proxy de CRC y colisiones, no un contador
-          dedicado.</td>
+        <td class="strong">{{ _("Errores") }}</td>
+        <td>{{ _("<code>Δ(recv_errors) / Δt</code>") }}</td>
+        <td>{{ _("<code>/status</code>. Es un proxy de CRC y colisiones, no un contador dedicado.") }}</td>
       </tr>
       <tr>
-        <td class="strong">SNR / RSSI</td>
-        <td>Mediana del percentil 50 por minuto, ponderada por volumen.</td>
-        <td><code>/packets</code>. Es una <strong>aproximación</strong>: para el
-          percentil exacto hay que ir a los paquetes crudos.</td>
+        <td class="strong">{{ _("SNR / RSSI") }}</td>
+        <td>{{ _("Mediana del percentil 50 por minuto, ponderada por volumen.") }}</td>
+        <td>{{ _("<code>/packets</code>. Es una <strong>aproximación</strong>: para el percentil exacto hay que ir a los paquetes crudos.") }}</td>
       </tr>
       <tr>
-        <td class="strong">Transmisiones</td>
-        <td>Hashes distintos. Una transmisión cuenta una vez aunque la oigan ocho
-          receptores.</td>
+        <td class="strong">{{ _("Transmisiones") }}</td>
+        <td>{{ _("Hashes distintos. Una transmisión cuenta una vez aunque la oigan ocho receptores.") }}</td>
         <td><code>/packets</code></td>
       </tr>
       <tr>
-        <td class="strong">Recepciones</td>
-        <td>Cuántas veces se ha oído algo, sumando receptores.</td>
+        <td class="strong">{{ _("Recepciones") }}</td>
+        <td>{{ _("Cuántas veces se ha oído algo, sumando receptores.") }}</td>
         <td><code>/packets</code></td>
       </tr>
       <tr>
-        <td class="strong">PDR</td>
-        <td><code>|A∩B| / |A∪B|</code> sobre hashes, dentro del mismo canal físico y
-          minuto.</td>
+        <td class="strong">{{ _("PDR") }}</td>
+        <td>{{ _("<code>|A∩B| / |A∪B|</code> sobre hashes, dentro del mismo canal físico y minuto.") }}</td>
         <td><code>/packets</code></td>
       </tr>
       <tr>
-        <td class="strong">Bytes</td>
-        <td>Longitud de la trama <strong>en el aire</strong> (<code>raw</code>) de las
-          transmisiones <strong>distintas</strong> (una vez por hash).</td>
-        <td><code>/packets</code>. <strong>Medido.</strong></td>
+        <td class="strong">{{ _("Bytes") }}</td>
+        <td>{{ _("Longitud de la trama <strong>en el aire</strong> (<code>raw</code>) de las transmisiones <strong>distintas</strong> (una vez por hash).") }}</td>
+        <td>{{ _("<code>/packets</code>. <strong>Medido.</strong>") }}</td>
       </tr>
       <tr>
-        <td class="strong">Tiempo de aire</td>
-        <td>Fórmula de Semtech sobre la <strong>mezcla real de tamaños</strong>, a cada
-          SF de la escalera.</td>
-        <td><strong>Modelo</strong>, no medición: el SF de emisión no se publica.</td>
+        <td class="strong">{{ _("Tiempo de aire") }}</td>
+        <td>{{ _("Fórmula de Semtech sobre la <strong>mezcla real de tamaños</strong>, a cada SF de la escalera.") }}</td>
+        <td>{{ _("<strong>Modelo</strong>, no medición: el SF de emisión no se publica.") }}</td>
       </tr>
     </tbody>
   </table>
 </div>
 <p class="prose">
-  Se guardan <strong>tres niveles</strong> porque no hay uno solo correcto: el canal
-  físico para el tráfico, el preset exacto para saber qué ve un receptor concreto, y
-  el observador para ruido, ocupación y errores.
+  {{ _("Se guardan <strong>tres niveles</strong> porque no hay uno solo correcto: el canal físico para el tráfico, el preset exacto para saber qué ve un receptor concreto, y el observador para ruido, ocupación y errores.") }}
 </p>
 
-<h2>El coste de cambiar de SF: bytes medidos, aire modelado</h2>
+<h2>{{ _("El coste de cambiar de SF: bytes medidos, aire modelado") }}</h2>
 <p class="prose">
-  Los <strong>bytes</strong> son una medición: se suma la longitud de la trama
-  <strong>en el aire</strong> (<code>raw</code>) de las transmisiones
-  <strong>distintas</strong>. La deduplicación por hash importa —una transmisión que
-  oyen ocho receptores aparece ocho veces en el crudo—, y sin ella el tráfico se
-  multiplicaría por el número de receptores.
+  {{ _("Los <strong>bytes</strong> son una medición: se suma la longitud de la trama <strong>en el aire</strong> (<code>raw</code>) de las transmisiones <strong>distintas</strong>. La deduplicación por hash importa —una transmisión que oyen ocho receptores aparece ocho veces en el crudo—, y sin ella el tráfico se multiplicaría por el número de receptores.") }}
 </p>
 <p class="prose">
-  Se usa la trama en el aire y <strong>no</strong> el <code>payload_len</code> del
-  broker, que es el payload de <em>aplicación</em>: en un Ack de 6 B, la trama en el
-  aire llega a 20-24 B, porque la cabecera y la ruta pesan más que el mensaje.
+  {{ _("Se usa la trama en el aire y <strong>no</strong> el <code>payload_len</code> del broker, que es el payload de <em>aplicación</em>: en un Ack de 6 B, la trama en el aire llega a 20-24 B, porque la cabecera y la ruta pesan más que el mensaje.") }}
 </p>
 <p class="prose">
-  Y se modela la <strong>mezcla real de tamaños</strong>, no un paquete medio. El
-  tráfico de una malla es <strong>bimodal</strong> —control pequeño por un lado,
-  adverts grandes por otro—, así que su media cae en un valle y no describe ningún
-  paquete que exista. Por eso el panel enseña la mediana y la mezcla, y el aire se
-  calcula tamaño a tamaño.
+  {{ _("Y se modela la <strong>mezcla real de tamaños</strong>, no un paquete medio. El tráfico de una malla es <strong>bimodal</strong> —control pequeño por un lado, adverts grandes por otro—, así que su media cae en un valle y no describe ningún paquete que exista. Por eso el panel enseña la mediana y la mezcla, y el aire se calcula tamaño a tamaño.") }}
 </p>
 <p class="prose">
-  El <strong>tiempo de aire</strong> es un modelo, no una medición, porque el broker
-  solo publica con qué configuración <em>escucha</em> cada receptor, nunca con cuál se
-  emitió. (Matiz: como SF y ancho <strong>tienen</strong> que coincidir para demodular,
-  el SF del canal sí es el de emisión; lo que no se conoce es la CR con la que se
-  emitió.) Se calcula con la fórmula de Semtech (AN1200.13) sobre esa mezcla:
+  {{ _("El <strong>tiempo de aire</strong> es un modelo, no una medición, porque el broker solo publica con qué configuración <em>escucha</em> cada receptor, nunca con cuál se emitió. (Matiz: como SF y ancho <strong>tienen</strong> que coincidir para demodular, el SF del canal sí es el de emisión; lo que no se conoce es la CR con la que se emitió.) Se calcula con la fórmula de Semtech (AN1200.13) sobre esa mezcla:") }}
 </p>
 <p class="prose">
   <code>T_sym = 2^SF / BW</code> ·
@@ -128,83 +96,55 @@
   <code>ToA = T_preamble + n_payload · T_sym</code>
 </p>
 <p class="prose">
-  El caso de «cambiar de SF» mantiene el ancho y recorre <strong>SF6…SF12</strong>
-  —SF6 es válido y es el más rápido y el menos sensible—. Cada paso de SF dobla
-  aproximadamente el aire y baja unos <strong>2,5 dB</strong> el umbral de
-  demodulación: eso es lo que se gana y lo que se paga.
+  {{ _("El caso de «cambiar de SF» mantiene el ancho y recorre <strong>SF6…SF12</strong> —SF6 es válido y es el más rápido y el menos sensible—. Cada paso de SF dobla aproximadamente el aire y baja unos <strong>2,5 dB</strong> el umbral de demodulación: eso es lo que se gana y lo que se paga.") }}
 </p>
 <p class="prose">
-  El <strong>margen</strong> que se muestra es un modelo de primer orden:
-  <code>SNR medido − umbral del SF</code>. Subir de SF no cambia la señal que llega,
-  pero sí baja el umbral, así que el enlace cierra con más holgura. Es una estimación
-  de sensibilidad, no un enlace medido, y por eso va etiquetada como modelo.
+  {{ _("El <strong>margen</strong> que se muestra es un modelo de primer orden: <code>SNR medido − umbral del SF</code>. Subir de SF no cambia la señal que llega, pero sí baja el umbral, así que el enlace cierra con más holgura. Es una estimación de sensibilidad, no un enlace medido, y por eso va etiquetada como modelo.") }}
 </p>
 <p class="prose">
-  Ojo con la confusión fácil: la <strong>ocupación</strong> que ya existía
-  (<code>chan_util_pct</code>, derivada de <code>tx_air_secs</code> y
-  <code>rx_air_secs</code>) <strong>sí</strong> es medida, y es otra cosa: mide cuánto
-  estuvo ocupado el receptor, no cuánto costaría emitir un payload a otro SF.
+  {{ _("Ojo con la confusión fácil: la <strong>ocupación</strong> que ya existía (<code>chan_util_pct</code>, derivada de <code>tx_air_secs</code> y <code>rx_air_secs</code>) <strong>sí</strong> es medida, y es otra cosa: mide cuánto estuvo ocupado el receptor, no cuánto costaría emitir un payload a otro SF.") }}
 </p>
 
-<h2>Siete trampas que hay que tener presentes</h2>
+<h2>{{ _("Siete trampas que hay que tener presentes") }}</h2>
 
-<h3>1. La interferencia no aparece como paquetes</h3>
+<h3>{{ _("1. La interferencia no aparece como paquetes") }}</h3>
 <p class="prose">
-  MeshCore filtra por <em>sync word</em>. El tráfico de Meshtastic y de LoRaWAN
-  <strong>no llega a la aplicación</strong>: se descarta en el hardware. La firma de la
-  interferencia es una <strong>subida del ruido de fondo y de los errores</strong>, no
-  tráfico ajeno decodificable. Cualquier gráfico que prometa «paquetes de Meshtastic
-  detectados» estaría mintiendo.
+  {{ _("MeshCore filtra por <em>sync word</em>. El tráfico de Meshtastic y de LoRaWAN <strong>no llega a la aplicación</strong>: se descarta en el hardware. La firma de la interferencia es una <strong>subida del ruido de fondo y de los errores</strong>, no tráfico ajeno decodificable. Cualquier gráfico que prometa «paquetes de Meshtastic detectados» estaría mintiendo.") }}
 </p>
 
-<h3>2. El techo de frescura lo pone la fuente</h3>
+<h3>{{ _("2. El techo de frescura lo pone la fuente") }}</h3>
 <p class="prose">
-  El ruido, la ocupación y los errores se publican cada <strong>300 s</strong> (medido:
-  11 intervalos de exactamente 300 s, uno de 60 s). Ninguna parte del sistema puede ser
-  más fresca que eso, y el intervalo de escritura no cambia nada de esto.
+  {{ _("El ruido, la ocupación y los errores se publican cada <strong>300 s</strong> (medido: 11 intervalos de exactamente 300 s, uno de 60 s). Ninguna parte del sistema puede ser más fresca que eso, y el intervalo de escritura no cambia nada de esto.") }}
 </p>
 
-<h3>3. «¿Qué canal es mejor?» es una pregunta de distribuciones</h3>
+<h3>{{ _("3. «¿Qué canal es mejor?» es una pregunta de distribuciones") }}</h3>
 <p class="prose">
-  Un paquete suelto a SNR +12 dB no dice nada. Las tablas son medias y medianas sobre
-  una ventana precisamente porque un valor instantáneo es ruido, no señal.
+  {{ _("Un paquete suelto a SNR +12 dB no dice nada. Las tablas son medias y medianas sobre una ventana precisamente porque un valor instantáneo es ruido, no señal.") }}
 </p>
 
-<h3>4. Sin receptores no hay comparación</h3>
+<h3>{{ _("4. Sin receptores no hay comparación") }}</h3>
 <p class="prose">
-  Solo se puede comparar lo que alguien escucha. En la primera medición los slots 2 y 3
-  (869.493 y 869.556) estaban vacíos. <a href="/campana">Ver los huecos.</a>
+  {{ _("Solo se puede comparar lo que alguien escucha. En la primera medición los slots 2 y 3 (869.493 y 869.556) estaban vacíos.") }}
+  <a href="/campana">{{ _("Ver los huecos.") }}</a>
 </p>
 
-<h3>5. La ventana de transición es ambigua</h3>
+<h3>{{ _("5. La ventana de transición es ambigua") }}</h3>
 <p class="prose">
-  Si un receptor cambia de configuración, el cambio ocurrió en algún punto entre los
-  dos <code>/status</code> que lo delimitan. Los paquetes de ese hueco se marcan como
-  dudosos y quedan fuera de los agregados. No se adivina a qué configuración
-  pertenecían.
+  {{ _("Si un receptor cambia de configuración, el cambio ocurrió en algún punto entre los dos <code>/status</code> que lo delimitan. Los paquetes de ese hueco se marcan como dudosos y quedan fuera de los agregados. No se adivina a qué configuración pertenecían.") }}
 </p>
 
-<h3>6. El ranking es heurístico</h3>
+<h3>{{ _("6. El ranking es heurístico") }}</h3>
 <p class="prose">
-  El índice de limpieza combina ruido (0,35), SNR (0,25), errores (0,25) y ocupación
-  (0,15) con pesos elegidos a mano. Es una ayuda para ordenar, no un veredicto: en las
-  tablas van siempre los valores crudos al lado para poder discrepar.
+  {{ _("El índice de limpieza combina ruido (0,35), SNR (0,25), errores (0,25) y ocupación (0,15) con pesos elegidos a mano. Es una ayuda para ordenar, no un veredicto: en las tablas van siempre los valores crudos al lado para poder discrepar.") }}
 </p>
 
-<h3>7. El tiempo de aire es modelado, no medido</h3>
+<h3>{{ _("7. El tiempo de aire es modelado, no medido") }}</h3>
 <p class="prose">
-  El broker no publica con qué SF se <strong>emitió</strong> una transmisión, solo con
-  cuál <strong>escucha</strong> cada receptor. Así que el aire de la escalera SF7…SF12
-  es un cálculo sobre el payload observado, no una observación. Y el margen de
-  sensibilidad es de primer orden. Sirve para decidir, no para certificar.
+  {{ _("El broker no publica con qué SF se <strong>emitió</strong> una transmisión, solo con cuál <strong>escucha</strong> cada receptor. Así que el aire de la escalera SF7…SF12 es un cálculo sobre el payload observado, no una observación. Y el margen de sensibilidad es de primer orden. Sirve para decidir, no para certificar.") }}
 </p>
 
-<h2>Sobre el hash</h2>
+<h2>{{ _("Sobre el hash") }}</h2>
 <p class="prose">
-  El <code>hash</code> que publica el broker es <strong>idéntico entre receptores</strong>
-  para la misma transmisión — comprobado: un mismo hash lo oyeron 8 receptores
-  distintos. Es lo que permite cruzar observadores y calcular el PDR. Ojo: no es el
-  mismo valor que el <code>message_hash</code> que devuelve el decodificador de
-  paquetes; son dos cosas distintas y aquí se usa el del broker.
+  {{ _("El <code>hash</code> que publica el broker es <strong>idéntico entre receptores</strong> para la misma transmisión — comprobado: un mismo hash lo oyeron 8 receptores distintos. Es lo que permite cruzar observadores y calcular el PDR. Ojo: no es el mismo valor que el <code>message_hash</code> que devuelve el decodificador de paquetes; son dos cosas distintas y aquí se usa el del broker.") }}
 </p>
 {% endblock %}

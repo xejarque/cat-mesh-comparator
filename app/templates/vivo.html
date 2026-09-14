@@ -1,33 +1,30 @@
 {% extends "base.html" %}
-{% block title %}En vivo · Observatorio MeshCore 868{% endblock %}
+{% block title %}{{ _("En vivo") }} · Meshcore Preset Analyzer{% endblock %}
 
 {% block content %}
-<h1>En vivo</h1>
+<h1>{{ _("En vivo") }}</h1>
 <p class="lede">
-  Cada paquete que el broker acaba de entregar, sin agregar. Sirve para comprobar que
-  un nodo está vivo y que un cambio de configuración ha surtido efecto, <strong>no</strong>
-  para decidir qué canal es mejor: un paquete suelto no dice nada sobre eso. Para
-  eso está el <a href="/comparador">comparador</a>.
+  {{ _("Cada paquete que el broker acaba de entregar, sin agregar. Sirve para comprobar que un nodo está vivo y que un cambio de configuración ha surtido efecto, <strong>no</strong> para decidir qué canal es mejor: un paquete suelto no dice nada sobre eso. Para eso está el") }}
+  <a href="/comparador">{{ _("comparador") }}</a>.
 </p>
 
 <div class="controls">
   <div class="field">
-    <span>Estado</span>
+    <span>{{ _("Estado") }}</span>
     <div style="display:flex;gap:12px;align-items:center;">
       <span class="live-dot" aria-hidden="true"></span>
-      <strong id="feed-status">al día</strong>
+      <strong id="feed-status">{{ _("al día") }}</strong>
     </div>
   </div>
-  <button class="btn" id="feed-toggle" type="button">Pausar</button>
+  <button class="btn" id="feed-toggle" type="button">{{ _("Pausar") }}</button>
   <p class="stamp" style="margin:0;">
-    Se consulta cada 2 s. Se conservan los 200 últimos en pantalla.
+    {{ _("Se consulta cada 2 s. Se conservan los 200 últimos en pantalla.") }}
   </p>
 </div>
 
 <div class="note" id="feed-error" hidden>
   <p>
-    No se puede contactar con el servidor. La tabla deja de actualizarse, pero lo que
-    ya está en pantalla sigue siendo válido. Se reintenta solo.
+    {{ _("No se puede contactar con el servidor. La tabla deja de actualizarse, pero lo que ya está en pantalla sigue siendo válido. Se reintenta solo.") }}
   </p>
 </div>
 
@@ -35,15 +32,15 @@
   <table>
     <thead>
       <tr>
-        <th>Hora</th>
-        <th>Observador</th>
-        <th>Zona</th>
-        <th>Canal</th>
-        <th>SNR</th>
-        <th>RSSI</th>
-        <th>Tipo</th>
-        <th>Saltos</th>
-        <th>Hash</th>
+        <th>{{ _("Hora") }}</th>
+        <th>{{ _("Observador") }}</th>
+        <th>{{ _("Zona") }}</th>
+        <th>{{ _("Canal") }}</th>
+        <th>{{ _("SNR") }}</th>
+        <th>{{ _("RSSI") }}</th>
+        <th>{{ _("Tipo") }}</th>
+        <th>{{ _("Saltos") }}</th>
+        <th>{{ _("Hash") }}</th>
       </tr>
     </thead>
     <tbody id="feed">
@@ -52,7 +49,7 @@
         <td>{{ row.ts | ts | truncate(16, true, "") }}</td>
         <td class="strong">{{ row.observer }}</td>
         <td>{{ row.iata or "—" }}</td>
-        <td>{{ row.channel }}</td>
+        <td>{{ _(row.channel) }}</td>
         <td>{{ row.snr_db | snr }}</td>
         <td>{{ row.rssi | db1 }}</td>
         <td>{{ row.payload_type or "—" }}</td>
@@ -66,16 +63,24 @@
 <p class="stamp" id="last-id-hidden" hidden>{{ last_id }}</p>
 {% if not packets %}
 <div class="empty-state">
-  <strong>Nada en el feed todavía</strong>
-  El recolector está conectado, pero aún no ha guardado ningún paquete. Aparecerán
-  aquí en cuanto lleguen.
+  <strong>{{ _("Nada en el feed todavía") }}</strong>
+  {{ _("El recolector está conectado, pero aún no ha guardado ningún paquete. Aparecerán aquí en cuanto lleguen.") }}
 </div>
 {% endif %}
 {% endblock %}
 
 {% block scripts %}
+<script id="i18n-data" type="application/json">{{ {
+  "al_dia": _("al día"),
+  "pausado": _("pausado"),
+  "nuevos": _("nuevos"),
+  "sin_conexion": _("sin conexión"),
+  "pausar": _("Pausar"),
+  "reanudar": _("Reanudar")
+} | tojson }}</script>
 <script>
 (function () {
+  const i18n = JSON.parse(document.getElementById('i18n-data').textContent);
   const feed = document.getElementById('feed');
   const status = document.getElementById('feed-status');
   const toggle = document.getElementById('feed-toggle');
@@ -128,19 +133,19 @@
       while (feed.children.length > 200) feed.lastElementChild.remove();
 
       status.textContent = data.packets.length
-        ? data.packets.length + ' nuevos'
-        : 'al día';
+        ? data.packets.length + ' ' + i18n.nuevos
+        : i18n.al_dia;
     } catch (error) {
       failures += 1;
       errorBox.hidden = false;
-      status.textContent = 'sin conexión';
+      status.textContent = i18n.sin_conexion;
     }
   }
 
   toggle.addEventListener('click', function () {
     paused = !paused;
-    toggle.textContent = paused ? 'Reanudar' : 'Pausar';
-    status.textContent = paused ? 'pausado' : 'al día';
+    toggle.textContent = paused ? i18n.reanudar : i18n.pausar;
+    status.textContent = paused ? i18n.pausado : i18n.al_dia;
     if (!paused) tick();
   });
 

@@ -102,6 +102,14 @@ def test_comparar_shows_the_cost_and_benefit_panel(client):
     assert "SF7" in response.text
 
 
+def test_comparar_shows_how_long_one_packet_takes(client):
+    # El número que hace tangible el coste de subir de SF: los ms de un paquete.
+    response = client.get("/comparar")
+
+    assert "Aire de 1 transmisión" in response.text
+    assert " ms" in response.text
+
+
 def test_comparar_says_which_channels_it_could_not_compare(client):
     # Con un solo canal y una sola comarca no hay comparación posible, y la página debe
     # decir cuál queda fuera y por qué en vez de omitir la sección en silencio.

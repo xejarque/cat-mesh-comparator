@@ -4,6 +4,7 @@ import sqlite3
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
+from urllib.parse import urlencode
 
 from fastapi import FastAPI, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -13,6 +14,15 @@ from fastapi.templating import Jinja2Templates
 from app.config import load_settings
 from app.db import connect, init_db
 from app.health import collector_health
+from app.i18n import (
+    COOKIE_MAX_AGE,
+    COOKIE_NAME,
+    DEFAULT_LANGUAGE,
+    LANGUAGE_SHORT,
+    LANGUAGES,
+    translate,
+    translator,
+)
 from app.periods import ChannelRegime, channel_regimes, compare_periods, find_control
 from app.query import (
     DIMENSION_LABELS,
@@ -69,8 +79,31 @@ async def lifespan(app: FastAPI):
     conn.close()
 
 
-app = FastAPI(title="Observatorio de canales MeshCore 868", lifespan=lifespan)
+app = FastAPI(title="Meshcore Preset Analyzer", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+
+@app.middleware("http")
+async def language_middleware(request: Request, call_next):
+    """Resuelve el idioma de la petición y lo recuerda.
+
+    ``?lang=`` manda sobre la cookie, y la cookie sobre el idioma por defecto. Si el
+    parámetro viene en la URL se reescribe la cookie para que la elección sobreviva a
+    la siguiente navegación y a los envíos de formulario.
+    """
+    requested = request.query_params.get("lang")
+    if requested not in LANGUAGES:
+        requested = None
+    cookie = request.cookies.get(COOKIE_NAME)
+    lang = requested or (cookie if cookie in LANGUAGES else DEFAULT_LANGUAGE)
+    request.state.lang = lang
+
+    response = await call_next(request)
+    if requested:
+        response.set_cookie(
+            COOKIE_NAME, lang, max_age=COOKIE_MAX_AGE, samesite="lax"
+        )
+    return response
 
 
 def _db(request: Request) -> sqlite3.Connection:
@@ -82,8 +115,35 @@ def _parse_dims(raw: str) -> tuple[str, ...]:
     return dims if dims else DIMENSIONS
 
 
+def lang_url(request: Request, code: str) -> str:
+    """La URL actual con el idioma cambiado, conservando los demás parámetros.
+
+    Se recorre ``multi_items()`` a propósito: ``/comparador`` repite ``by`` y un ``dict``
+    (o ``URL.include_query_params``) colapsaría las repeticiones y perdería filtros.
+    """
+    params = [
+        (key, value)
+        for key, value in request.query_params.multi_items()
+        if key != "lang"
+    ]
+    params.append(("lang", code))
+    return f"{request.url.path}?{urlencode(params)}"
+
+
 def _context(request: Request, **extra: object) -> dict[str, object]:
-    return {"nav": NAV, "dims_all": DIMENSIONS, "dim_labels": DIMENSION_LABELS, **extra}
+    lang = getattr(request.state, "lang", DEFAULT_LANGUAGE)
+    t = translator(lang)
+    return {
+        "nav": [(href, t(label)) for href, label in NAV],
+        "dims_all": DIMENSIONS,
+        "dim_labels": {name: t(label) for name, label in DIMENSION_LABELS.items()},
+        "lang": lang,
+        "langs": [(code, LANGUAGE_SHORT[code]) for code in LANGUAGES],
+        "lang_url": lang_url,
+        "_": t,
+        "request": request,
+        **extra,
+    }
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -139,6 +199,7 @@ async def api_packets(request: Request, after: int = Query(0), limit: int = Quer
     """
     conn = _db(request)
     packets = recent_packets(conn, after_id=after, limit=limit)
+    lang = getattr(request.state, "lang", DEFAULT_LANGUAGE)
     return JSONResponse(
         {
             "packets": [
@@ -147,7 +208,7 @@ async def api_packets(request: Request, after: int = Query(0), limit: int = Quer
                     "time": time.strftime("%H:%M:%S", time.localtime(row.ts)),
                     "observer": row.observer,
                     "iata": row.iata or "",
-                    "channel": row.channel,
+                    "channel": str(translate(row.channel, lang)),
                     "snr_db": row.snr_db,
                     "rssi": row.rssi,
                     "payload_type": row.payload_type or "",
@@ -379,17 +440,18 @@ def _fmt_ts(value: object) -> str:
     return time.strftime("%Y-%m-%d %H:%M", time.localtime(int(value)))
 
 
-def _fmt_ago(value: object) -> str:
+def _fmt_ago(value: object, lang: str = DEFAULT_LANGUAGE) -> str:
     if not value:
         return "—"
+    t = translator(lang)
     seconds = int(time.time()) - int(value)
     if seconds < 90:
-        return "hace segundos"
+        return t("hace segundos")
     if seconds < 5400:
-        return f"hace {seconds // 60} min"
+        return t("hace {n} min", n=seconds // 60)
     if seconds < 172800:
-        return f"hace {seconds // 3600} h"
-    return f"hace {seconds // 86400} d"
+        return t("hace {n} h", n=seconds // 3600)
+    return t("hace {n} d", n=seconds // 86400)
 
 
 def _fmt_bytes(value: object) -> str:
@@ -425,6 +487,7 @@ templates.env.filters.update(
     num=_fmt_int,
     bsize=_fmt_bytes,
     ratio=lambda v: _fmt(v, 2, "×"),
+    ms=lambda v: _fmt(v, 1, " ms"),
     ddb=lambda v: _fmt_signed(v, 1, " dB"),
     dpct=lambda v: _fmt_signed(v, 1, " %"),
     ts=_fmt_ts,

@@ -1,18 +1,23 @@
 <!doctype html>
-<html lang="es">
+<html lang="{{ lang }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Observatorio MeshCore 868{% endblock %}</title>
+  <title>{% block title %}Meshcore Preset Analyzer{% endblock %}</title>
   <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
   <header class="site">
     <div class="wrap">
-      <a class="brand" href="/">Observatorio <span>MeshCore 868</span></a>
+      <a class="brand" href="/">Meshcore <span>Preset Analyzer</span></a>
       <nav class="site">
         {% for href, label in nav %}
         <a href="{{ href }}"{% if active == href %} aria-current="page"{% endif %}>{{ label }}</a>
+        {% endfor %}
+      </nav>
+      <nav class="langs" aria-label="{{ _('Idioma') }}">
+        {% for code, label in langs %}
+        <a href="{{ lang_url(request, code) }}"{% if code == lang %} aria-current="page"{% endif %}>{{ label }}</a>
         {% endfor %}
       </nav>
     </div>
@@ -26,8 +31,8 @@
 
   <footer class="site">
     <div class="wrap">
-      Datos del broker comunitario de Cataluña, en directo.
-      {% if generated_at %}Consulta generada el {{ generated_at | ts }}.{% endif %}
+      {{ _("Datos del broker comunitario de Cataluña, en directo.") }}
+      {% if generated_at %}{{ _("Consulta generada el") }} {{ generated_at | ts }}.{% endif %}
     </div>
   </footer>
   {% block scripts %}{% endblock %}

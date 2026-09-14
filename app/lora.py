@@ -100,6 +100,9 @@ class AirtimeProjection:
     """Qué costaría el tráfico observado si la red emitiera con otro SF."""
 
     sf: int
+    # Tiempo de aire de **una** transmisión, promediado sobre la mezcla real. Es el
+    # número que hace tangible el coste: «un paquete tarda esto».
+    mean_toa_ms: float
     # Aire que ocupa la mezcla sobre el tiempo observado, en % del canal.
     airtime_pct: float
     seconds_per_hour: float
@@ -130,7 +133,8 @@ def project_sf_ladder(
         return ()
 
     current_air = airtime_s(sizes, current_sf, bw_khz, cr)
-    if current_air <= 0:
+    transmissions = sum(count for count in sizes.values() if count > 0)
+    if current_air <= 0 or transmissions <= 0:
         return ()
 
     ladder = tuple(sorted({*SF_LADDER, current_sf}))
@@ -139,6 +143,9 @@ def project_sf_ladder(
     return tuple(
         AirtimeProjection(
             sf=sf,
+            mean_toa_ms=(
+                1000.0 * airtime_s(sizes, sf, bw_khz, cr) / transmissions
+            ),
             airtime_pct=100.0 * airtime_s(sizes, sf, bw_khz, cr) / active_seconds,
             seconds_per_hour=3600.0 * airtime_s(sizes, sf, bw_khz, cr) / active_seconds,
             factor_vs_current=airtime_s(sizes, sf, bw_khz, cr) / current_air,

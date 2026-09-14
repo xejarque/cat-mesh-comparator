@@ -1,68 +1,62 @@
 {% extends "base.html" %}
-{% block title %}Calidad · Observatorio MeshCore 868{% endblock %}
+{% block title %}{{ _("Calidad") }} · Meshcore Preset Analyzer{% endblock %}
 
 {% block content %}
-<h1>Calidad del dato</h1>
+<h1>{{ _("Calidad del dato") }}</h1>
 <p class="lede">
-  Un paquete sin atribuir no es lo mismo que un paquete perdido, y tampoco todos los
-  «sin atribuir» son la misma cosa. Esta página separa las causas para que un caso
-  irreductible no parezca un fallo del sistema.
+  {{ _("Un paquete sin atribuir no es lo mismo que un paquete perdido, y tampoco todos los «sin atribuir» son la misma cosa. Esta página separa las causas para que un caso irreductible no parezca un fallo del sistema.") }}
 </p>
 
 <div class="table-scroll">
   <table class="plain">
     <thead>
       <tr>
-        <th>Causa</th>
-        <th>Qué es</th>
-        <th>¿Se puede evitar?</th>
+        <th>{{ _("Causa") }}</th>
+        <th>{{ _("Qué es") }}</th>
+        <th>{{ _("¿Se puede evitar?") }}</th>
       </tr>
     </thead>
     <tbody>
       <tr>
-        <td class="strong">Ventana de transición</td>
-        <td>El receptor cambió de configuración entre dos <code>/status</code>. No se
-          sabe en qué instante exacto ocurrió.</td>
-        <td>No. Se acota a la cadencia del status y el paquete se marca como dudoso.</td>
+        <td class="strong">{{ _("Ventana de transición") }}</td>
+        <td>{{ _("El receptor cambió de configuración entre dos <code>/status</code>. No se sabe en qué instante exacto ocurrió.") }}</td>
+        <td>{{ _("No. Se acota a la cadencia del status y el paquete se marca como dudoso.") }}</td>
       </tr>
       <tr>
-        <td class="strong">Hueco largo sin status</td>
-        <td>El receptor lleva más de 10 minutos sin publicar <code>/status</code>.</td>
-        <td>No. El paquete se marca como dudoso.</td>
+        <td class="strong">{{ _("Hueco largo sin status") }}</td>
+        <td>{{ _("El receptor lleva más de 10 minutos sin publicar <code>/status</code>.") }}</td>
+        <td>{{ _("No. El paquete se marca como dudoso.") }}</td>
       </tr>
       <tr>
-        <td class="strong">Primera aparición</td>
-        <td>El receptor empezó a emitir antes de publicar su primer <code>/status</code>
-          con <code>radio</code>.</td>
-        <td>No. Esa información no existía todavía en ningún sitio.</td>
+        <td class="strong">{{ _("Primera aparición") }}</td>
+        <td>{{ _("El receptor empezó a emitir antes de publicar su primer <code>/status</code> con <code>radio</code>.") }}</td>
+        <td>{{ _("No. Esa información no existía todavía en ningún sitio.") }}</td>
       </tr>
       <tr>
-        <td class="strong">Sin status utilizable</td>
-        <td>Solo publica avisos <code>offline</code>, sin <code>radio</code>.</td>
-        <td>Sí, pidiendo al operador que lo active.</td>
+        <td class="strong">{{ _("Sin status utilizable") }}</td>
+        <td>{{ _("Solo publica avisos <code>offline</code>, sin <code>radio</code>.") }}</td>
+        <td>{{ _("Sí, pidiendo al operador que lo active.") }}</td>
       </tr>
       <tr>
-        <td class="strong">Conflicto de hash</td>
-        <td>El mismo hash aparece en dos <em>canales físicos</em> distintos. Una
-          transmisión no puede oírse en dos frecuencias: una de las dos atribuciones
-          está mal.</td>
-        <td>Es la comprobación de sanidad. Debería quedarse en cero.</td>
+        <td class="strong">{{ _("Conflicto de hash") }}</td>
+        <td>{{ _("El mismo hash aparece en dos <em>canales físicos</em> distintos. Una transmisión no puede oírse en dos frecuencias: una de las dos atribuciones está mal.") }}</td>
+        <td>{{ _("Es la comprobación de sanidad. Debería quedarse en cero.") }}</td>
       </tr>
     </tbody>
   </table>
 </div>
 
-<h2>Últimos días</h2>
+<h2>{{ _("Últimos días") }}</h2>
 {% if quality %}
 <div class="table-scroll">
   <table>
     <thead>
       <tr>
-        <th>Día</th>
-        <th>Observadores sin status</th>
-        <th>Dudosos</th>
-        <th>Sin atribuir</th>
-        <th>Conflictos de hash</th>
+        <th>{{ _("Día") }}</th>
+        <th>{{ _("Observadores sin status") }}</th>
+        <th>{{ _("Dudosos") }}</th>
+        <th>{{ _("Sin atribuir") }}</th>
+        <th>{{ _("Conflictos de hash") }}</th>
       </tr>
     </thead>
     <tbody>
@@ -81,15 +75,13 @@
 
 <div class="note">
   <p>
-    Los paquetes <strong>dudosos y sin atribuir no entran en ningún agregado</strong>:
-    quedan fuera de las medias, del PDR y de los rankings. Preferimos perder unas
-    pocas muestras a que un dato ambiguo sesgue la comparación sin que se note.
+    {{ _("Los paquetes <strong>dudosos y sin atribuir no entran en ningún agregado</strong>: quedan fuera de las medias, del PDR y de los rankings. Preferimos perder unas pocas muestras a que un dato ambiguo sesgue la comparación sin que se note.") }}
   </p>
 </div>
 {% else %}
 <div class="empty-state">
-  <strong>Sin métricas de calidad todavía</strong>
-  Se calculan junto con el resto de agregados, cada cinco minutos.
+  <strong>{{ _("Sin métricas de calidad todavía") }}</strong>
+  {{ _("Se calculan junto con el resto de agregados, cada cinco minutos.") }}
 </div>
 {% endif %}
 {% endblock %}

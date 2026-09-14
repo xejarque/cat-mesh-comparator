@@ -1,60 +1,54 @@
 {% extends "base.html" %}
-{% block title %}Resumen · Observatorio MeshCore 868{% endblock %}
+{% block title %}{{ _("Resumen") }} · Meshcore Preset Analyzer{% endblock %}
 
 {% block content %}
-<h1>Qué canal está más limpio</h1>
+<h1>{{ _("Qué canal está más limpio") }}</h1>
 <p class="lede">
-  Este observatorio mide, con datos reales del broker comunitario, cómo se comporta
-  cada <strong>canal físico</strong> de la banda de 868 MHz. La pregunta que responde
-  no es «qué se oye ahora», sino «qué combinación de frecuencia, ancho y SF aguanta
-  mejor» — que es una pregunta sobre distribuciones, no sobre un instante.
+  {{ _("Este observatorio mide, con datos reales del broker comunitario, cómo se comporta cada <strong>canal físico</strong> de la banda de 868 MHz. La pregunta que responde no es «qué se oye ahora», sino «qué combinación de frecuencia, ancho y SF aguanta mejor» — que es una pregunta sobre distribuciones, no sobre un instante.") }}
 </p>
 
 <div class="metrics">
   <div class="metric">
     <span class="value">{{ summaries | length }}</span>
-    <span class="label">Canales con datos (24 h)</span>
+    <span class="label">{{ _("Canales con datos (24 h)") }}</span>
   </div>
   <div class="metric">
     <span class="value">{{ observers | length }}</span>
-    <span class="label">Observadores</span>
+    <span class="label">{{ _("Observadores") }}</span>
   </div>
   <div class="metric">
     <span class="value">{{ summaries | sum(attribute='transmissions') | num }}</span>
-    <span class="label">Transmisiones distintas</span>
+    <span class="label">{{ _("Transmisiones distintas") }}</span>
   </div>
   <div class="metric">
     <span class="value">{{ summaries | sum(attribute='pkts') | num }}</span>
-    <span class="label">Recepciones</span>
+    <span class="label">{{ _("Recepciones") }}</span>
   </div>
 </div>
 
 {% if health and health.stale %}
 <div class="note warn">
   <p>
-    <strong>El colector lleva {{ (health.age_seconds // 60) }} minutos sin recibir nada.</strong>
-    Lo normal es que llegue tráfico cada pocos minutos. O el broker está caído, o el
-    recolector se ha parado — y cuando se para no avisa. Comprueba el servicio con
-    <code>docker compose ps</code> o <code>systemctl status cat-mesh-collector</code>.
+    {{ _("<strong>El colector lleva {n} minutos sin recibir nada.</strong> Lo normal es que llegue tráfico cada pocos minutos. O el broker está caído, o el recolector se ha parado — y cuando se para no avisa. Comprueba el servicio con <code>docker compose ps</code> o <code>systemctl status cat-mesh-collector</code>.", n=(health.age_seconds // 60)) }}
   </p>
 </div>
 {% endif %}
 
 {% if summaries %}
-<h2>Últimas 24 horas, por canal físico</h2>
+<h2>{{ _("Últimas 24 horas, por canal físico") }}</h2>
 <div class="table-scroll">
   <table>
     <thead>
       <tr>
-        <th>Canal</th>
-        <th>Transmisiones</th>
-        <th>Recepciones</th>
-        <th>SNR mediana</th>
-        <th>Ruido de fondo</th>
-        <th>Ocupación</th>
-        <th>Errores/h</th>
-        <th>Observadores</th>
-        <th>CR de los receptores</th>
+        <th>{{ _("Canal") }}</th>
+        <th>{{ _("Transmisiones") }}</th>
+        <th>{{ _("Recepciones") }}</th>
+        <th>{{ _("SNR mediana") }}</th>
+        <th>{{ _("Ruido de fondo") }}</th>
+        <th>{{ _("Ocupación") }}</th>
+        <th>{{ _("Errores/h") }}</th>
+        <th>{{ _("Observadores") }}</th>
+        <th>{{ _("CR de los receptores") }}</th>
       </tr>
     </thead>
     <tbody>
@@ -77,33 +71,26 @@
 
 <div class="note">
   <p>
-    La última columna es la <strong>CR de los receptores</strong>, no del tráfico.
-    Viaja en la cabecera LoRa, así que dos receptores con CR distinta sobre la misma
-    frecuencia y SF oyen exactamente lo mismo: por eso <strong>no</strong> se usa como
-    dimensión al comparar.
-    <a href="/metodologia">Cómo se miden las métricas</a>.
+    {{ _("La última columna es la <strong>CR de los receptores</strong>, no del tráfico. Viaja en la cabecera LoRa, así que dos receptores con CR distinta sobre la misma frecuencia y SF oyen exactamente lo mismo: por eso <strong>no</strong> se usa como dimensión al comparar.") }}
+    <a href="/metodologia">{{ _("Cómo se miden las métricas") }}</a>.
   </p>
 </div>
 
-<p><a href="/comparador">Ver el comparador completo →</a></p>
+<p><a href="/comparador">{{ _("Ver el comparador completo →") }}</a></p>
 {% else %}
 <div class="empty-state">
-  <strong>Todavía no hay datos agregados</strong>
-  El recolector está conectado, pero aún no se ha ejecutado ninguna consolidación.
-  Los agregados se recalculan cada 5 minutos.
+  <strong>{{ _("Todavía no hay datos agregados") }}</strong>
+  {{ _("El recolector está conectado, pero aún no se ha ejecutado ninguna consolidación. Los agregados se recalculan cada 5 minutos.") }}
 </div>
 {% endif %}
 
 {% if quality %}
-<h2>Calidad del dato</h2>
+<h2>{{ _("Calidad del dato") }}</h2>
 <p>
-  En los últimos 30 días: <strong>{{ quality.unattributed_packets | num }}</strong>
-  paquetes sin preset atribuible,
-  <strong>{{ quality.uncertain_packets | num }}</strong> en ventana ambigua y
-  <strong>{{ quality.hash_conflicts | num }}</strong> conflictos de hash.
+  {{ _("En los últimos 30 días: <strong>{unattributed}</strong> paquetes sin preset atribuible, <strong>{uncertain}</strong> en ventana ambigua y <strong>{conflicts}</strong> conflictos de hash.", unattributed=(quality.unattributed_packets | num), uncertain=(quality.uncertain_packets | num), conflicts=(quality.hash_conflicts | num)) }}
 </p>
 <p class="stamp">
-  Los paquetes sin atribuir no entran en ningún agregado. <a href="/calidad">Por qué.</a>
+  {{ _("Los paquetes sin atribuir no entran en ningún agregado.") }} <a href="/calidad">{{ _("Por qué.") }}</a>
 </p>
 {% endif %}
 {% endblock %}

@@ -86,6 +86,19 @@ nav.site a {
 nav.site a:hover { color: var(--ink); }
 nav.site a[aria-current="page"] { color: var(--accent-ink); border-bottom-color: var(--accent); }
 
+/* Selector de idioma: el mismo lenguaje que la navegación, pero separado de ella. */
+nav.langs { display: flex; gap: 8px; margin-left: var(--space-4); }
+nav.langs a {
+  color: var(--ink-faint);
+  text-decoration: none;
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  padding-bottom: 2px;
+  border-bottom: 2px solid transparent;
+}
+nav.langs a:hover { color: var(--ink); }
+nav.langs a[aria-current="page"] { color: var(--accent-ink); border-bottom-color: var(--accent); }
+
 main { padding: var(--space-9) 0; }
 footer.site {
   border-top: 1px solid var(--line);

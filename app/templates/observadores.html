@@ -1,12 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Observadores · Observatorio MeshCore 868{% endblock %}
+{% block title %}{{ _("Observadores") }} · Meshcore Preset Analyzer{% endblock %}
 
 {% block content %}
-<h1>Observadores</h1>
+<h1>{{ _("Observadores") }}</h1>
 <p class="lede">
-  Cada receptor que publica en el broker. Lo que se compara entre canales son
-  <em>distribuciones</em> de lo que estos nodos oyen, así que saber quién escucha y
-  con qué configuración es parte del dato, no un anexo.
+  {{ _("Cada receptor que publica en el broker. Lo que se compara entre canales son <em>distribuciones</em> de lo que estos nodos oyen, así que saber quién escucha y con qué configuración es parte del dato, no un anexo.") }}
 </p>
 
 {% if observers %}
@@ -14,16 +12,16 @@
   <table>
     <thead>
       <tr>
-        <th>Observador</th>
-        <th>Zona</th>
-        <th>Hardware</th>
-        <th>Configuración</th>
-        <th>CR</th>
-        <th>Ruido de fondo</th>
-        <th>Ocupación</th>
-        <th>Errores/h</th>
-        <th>Recepciones</th>
-        <th>Última vez</th>
+        <th>{{ _("Observador") }}</th>
+        <th>{{ _("Zona") }}</th>
+        <th>{{ _("Hardware") }}</th>
+        <th>{{ _("Configuración") }}</th>
+        <th>{{ _("CR") }}</th>
+        <th>{{ _("Ruido de fondo") }}</th>
+        <th>{{ _("Ocupación") }}</th>
+        <th>{{ _("Errores/h") }}</th>
+        <th>{{ _("Recepciones") }}</th>
+        <th>{{ _("Última vez") }}</th>
       </tr>
     </thead>
     <tbody>
@@ -38,7 +36,7 @@
         <td>{{ row.chan_util_pct | pct }}</td>
         <td>{{ row.err_per_h | db1 }}</td>
         <td>{{ row.pkts_rx | num }}</td>
-        <td class="muted">{{ row.last_seen | ago }}</td>
+        <td class="muted">{{ row.last_seen | ago(lang) }}</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -47,23 +45,18 @@
 
 <div class="note">
   <p>
-    <strong>Sin mapa, de momento.</strong> El broker no publica la posición de los
-    observadores: el decoder sí puede extraerla de los <em>adverts</em>, pero eso
-    todavía no se está guardando. Preferimos no dibujar un mapa con posiciones
-    inventadas.
+    {{ _("<strong>Sin mapa, de momento.</strong> El broker no publica la posición de los observadores: el decoder sí puede extraerla de los <em>adverts</em>, pero eso todavía no se está guardando. Preferimos no dibujar un mapa con posiciones inventadas.") }}
   </p>
 </div>
 
 <p class="stamp">
-  Un observador que solo aparece con un aviso <code>offline</code> no tiene preset
-  utilizable, y sus paquetes no se pueden atribuir. Se ve en
-  <a href="/calidad">Calidad</a>.
+  {{ _("Un observador que solo aparece con un aviso <code>offline</code> no tiene preset utilizable, y sus paquetes no se pueden atribuir. Se ve en") }}
+  <a href="/calidad">{{ _("Calidad") }}</a>.
 </p>
 {% else %}
 <div class="empty-state">
-  <strong>Ningún observador todavía</strong>
-  El recolector aún no ha recibido ningún <code>/status</code>. Hasta que llegue uno,
-  no hay nada que atribuir.
+  <strong>{{ _("Ningún observador todavía") }}</strong>
+  {{ _("El recolector aún no ha recibido ningún <code>/status</code>. Hasta que llegue uno, no hay nada que atribuir.") }}
 </div>
 {% endif %}
 {% endblock %}

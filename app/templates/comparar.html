@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Comparar · Observatorio MeshCore 868{% endblock %}
+{% block title %}{{ _("Comparar") }} · Meshcore Preset Analyzer{% endblock %}
 
 {% macro subject_block(subject) %}
 <section class="paired">
@@ -12,34 +12,33 @@
   </h3>
   <p class="stamp">
     {% if subject.only_sf_changes %}
-      <span class="flag-warn">Misma frecuencia, solo cambia el SF</span> · un receptor
-      SF7 no puede oír una transmisión SF8, así que cada uno ve a un conjunto distinto
-      de emisores: esto describe poblaciones distintas, no el mismo enlace
+      <span class="flag-warn">{{ _("Misma frecuencia, solo cambia el SF") }}</span> ·
+      {{ _("un receptor SF7 no puede oír una transmisión SF8, así que cada uno ve a un conjunto distinto de emisores: esto describe poblaciones distintas, no el mismo enlace") }}
     {% elif subject.comparable %}
-      Se solapan {{ subject.overlap_seconds // 60 }} min · comparación válida
+      {{ _("Se solapan {n} min · comparación válida", n=(subject.overlap_seconds // 60)) }}
     {% else %}
-      <span class="flag-warn">Sin solapamiento temporal</span> · la diferencia entre
-      canales podría ser propagación, no canal
+      <span class="flag-warn">{{ _("Sin solapamiento temporal") }}</span> ·
+      {{ _("la diferencia entre canales podría ser propagación, no canal") }}
     {% endif %}
   </p>
   <div class="table-scroll">
     <table>
       <thead>
         <tr>
-          <th>Métrica</th>
+          <th>{{ _("Métrica") }}</th>
           {% for m in subject.measurements %}<th>{{ m.channel_label }}</th>{% endfor %}
         </tr>
       </thead>
       <tbody>
         <tr>
-          <td class="muted">Medido entre</td>
+          <td class="muted">{{ _("Medido entre") }}</td>
           {% for m in subject.measurements %}
           <td class="muted">{{ m.first_ts | ts }} – {{ m.last_ts | ts }}</td>
           {% endfor %}
         </tr>
         {% for i in range(subject.measurements[0].metrics | length) %}
         <tr>
-          <td>{{ subject.measurements[0].metrics[i].label }}</td>
+          <td>{{ _(subject.measurements[0].metrics[i].label) }}</td>
           {% for m in subject.measurements %}
           <td class="strong">{{ m.metrics[i].value | metric(m.metrics[i].unit) }}</td>
           {% endfor %}
@@ -52,60 +51,44 @@
 {% endmacro %}
 
 {% block content %}
-<h1>Comparar canales de verdad</h1>
+<h1>{{ _("Comparar canales de verdad") }}</h1>
 {% include "_comparar_tabs.html" %}
 
 <div class="note">
   <p>
-    <strong>El comparador normal compara canales medidos por receptores distintos.</strong>
-    Eso mezcla geografía, antena, hardware y momento: si dos canales salen diferentes,
-    no se sabe qué lo causó. Aquí solo aparecen sujetos que han estado en
-    <strong>más de un canal</strong> — el mismo receptor, la misma pareja o la misma
-    comarca. Es la única forma de poder decir «esto es por el canal».
+    {{ _("<strong>El comparador normal compara canales medidos por receptores distintos.</strong> Eso mezcla geografía, antena, hardware y momento: si dos canales salen diferentes, no se sabe qué lo causó. Aquí solo aparecen sujetos que han estado en <strong>más de un canal</strong> — el mismo receptor, la misma pareja o la misma comarca. Es la única forma de poder decir «esto es por el canal».") }}
   </p>
   <p>
-    Y una regla dura: <strong>si las medidas no se solapan en el tiempo, no se
-    comparan.</strong> Dos días distintos pueden diferir por propagación, no por canal.
+    {{ _("Y una regla dura: <strong>si las medidas no se solapan en el tiempo, no se comparan.</strong> Dos días distintos pueden diferir por propagación, no por canal.") }}
   </p>
 </div>
 
 <form class="controls" method="get" action="/comparar">
+  <input type="hidden" name="lang" value="{{ lang }}">
   <label class="field">
-    <span>Ventana</span>
+    <span>{{ _("Ventana") }}</span>
     <select name="window">
       {% for option in windows %}
       <option value="{{ option }}"{% if option == window %} selected{% endif %}>{{ option }}</option>
       {% endfor %}
     </select>
   </label>
-  <button class="btn" type="submit">Aplicar</button>
-  <p class="stamp" style="margin:0;">Datos hasta {{ generated_at | ts }}</p>
+  <button class="btn" type="submit">{{ _("Aplicar") }}</button>
+  <p class="stamp" style="margin:0;">{{ _("Datos hasta {ts}", ts=(generated_at | ts)) }}</p>
 </form>
 
 {% if costs %}
-<h2>Coste y beneficio de cambiar de SF</h2>
+<h2>{{ _("Coste y beneficio de cambiar de SF") }}</h2>
 <div class="note">
   <p>
-    <strong>Los bytes se miden; el tiempo de aire se calcula.</strong> Los bytes son la
-    trama <strong>en el aire</strong> (cabecera y ruta incluidas), y una transmisión
-    cuenta <strong>una vez</strong> aunque la oigan ocho receptores. El tiempo de aire
-    se <strong>modela</strong> con la fórmula de Semtech: el broker no publica con qué
-    SF se emitió, solo con cuál escucha cada receptor.
+    {{ _("<strong>Los bytes se miden; el tiempo de aire se calcula.</strong> Los bytes son la trama <strong>en el aire</strong> (cabecera y ruta incluidas), y una transmisión cuenta <strong>una vez</strong> aunque la oigan ocho receptores. El tiempo de aire se <strong>modela</strong> con la fórmula de Semtech: el broker no publica con qué SF se emitió, solo con cuál escucha cada receptor.") }}
   </p>
   <p>
-    Se modela la <strong>mezcla real de tamaños</strong>, no un paquete medio: el
-    tráfico de una malla es <strong>bimodal</strong> (control pequeño y adverts
-    grandes), así que su media no describe ningún paquete que exista. Y como SF y ancho
-    tienen que coincidir para demodular, el SF del canal <em>es</em> el de emisión: la
-    columna de su SF no es una hipótesis.
+    {{ _("Se modela la <strong>mezcla real de tamaños</strong>, no un paquete medio: el tráfico de una malla es <strong>bimodal</strong> (control pequeño y adverts grandes), así que su media no describe ningún paquete que exista. Y como SF y ancho tienen que coincidir para demodular, el SF del canal <em>es</em> el de emisión: la columna de su SF no es una hipótesis.") }}
   </p>
   <p>
-    El <strong>margen</strong> es un modelo de primer orden: SNR medido menos el umbral
-    de demodulación de cada SF. Subir de SF no cambia la señal que llega, pero sí baja
-    el umbral, así que el enlace cierra con más holgura. La escalera cubre
-    <strong>SF6 a SF12</strong>: SF6 también es un preset válido, el más rápido y el
-    menos sensible. Y solo se puede corroborar el SF donde alguien escucha:
-    <a href="/campana">ver los huecos →</a>
+    {{ _("El <strong>margen</strong> es un modelo de primer orden: SNR medido menos el umbral de demodulación de cada SF. Subir de SF no cambia la señal que llega, pero sí baja el umbral, así que el enlace cierra con más holgura. La escalera cubre <strong>SF6 a SF12</strong>: SF6 también es un preset válido, el más rápido y el menos sensible. Y solo se puede corroborar el SF donde alguien escucha:") }}
+    <a href="/campana">{{ _("ver los huecos →") }}</a>
   </p>
 </div>
 
@@ -116,23 +99,20 @@
     <span class="muted">· CR4/{{ cost.cr if cost.cr is not none else '?' }}</span>
   </h3>
   <p class="stamp">
-    Medido: {{ cost.transmissions_per_h | num }} transmisiones/h ·
-    {{ cost.bytes_per_h | bsize }}/h ·
-    mediana {{ cost.median_size_bytes if cost.median_size_bytes is not none else '—' }} B
-    en el aire · SNR p50 {{ cost.snr_p50_db | snr }}
-    {%- if cost.noise_floor_dbm is not none %} · ruido {{ cost.noise_floor_dbm | db }}{% endif %}
-    · {{ cost.minutes }} min con datos
+    {{ _("Medido: {tx} transmisiones/h · {bytes}/h · mediana {median} B en el aire · SNR p50 {snr}", tx=(cost.transmissions_per_h | num), bytes=(cost.bytes_per_h | bsize), median=(cost.median_size_bytes if cost.median_size_bytes is not none else "—"), snr=(cost.snr_p50_db | snr)) }}
+    {%- if cost.noise_floor_dbm is not none %} · {{ _("ruido {dbm}", dbm=(cost.noise_floor_dbm | db)) }}{% endif %}
+    · {{ _("{minutes} min con datos", minutes=cost.minutes) }}
   </p>
   {% if cost.can_model %}
   <p class="stamp">
-    Mezcla real: {% for size, count in cost.top_sizes %}{{ size }} B ×{{ count }}{% if not loop.last %} · {% endif %}{% endfor %}
-    {%- if cost.distinct_sizes > cost.top_sizes | length %} · y {{ cost.distinct_sizes - (cost.top_sizes | length) }} tamaños más{% endif %}
+    {{ _("Mezcla real:") }} {% for size, count in cost.top_sizes %}{{ size }} B ×{{ count }}{% if not loop.last %} · {% endif %}{% endfor %}
+    {%- if cost.distinct_sizes > cost.top_sizes | length %} · {{ _("y {n} tamaños más", n=(cost.distinct_sizes - (cost.top_sizes | length))) }}{% endif %}
   </p>
   <div class="table-scroll">
     <table>
       <thead>
         <tr>
-          <th>Modelo (aire)</th>
+          <th>{{ _("Modelo (aire)") }}</th>
           {% for p in cost.projections %}
           <th{% if p.sf == cost.sf %} class="strong"{% endif %}>SF{{ p.sf }}</th>
           {% endfor %}
@@ -140,24 +120,33 @@
       </thead>
       <tbody>
         <tr>
+          <td>
+            {{ _("Aire de 1 transmisión") }}
+            <span class="muted">· {{ _("lo que tarda un paquete en emitirse") }}</span>
+          </td>
+          {% for p in cost.projections %}
+          <td class="strong">{{ p.mean_toa_ms | ms }}</td>
+          {% endfor %}
+        </tr>
+        <tr>
           <td class="muted">
-            Aire del canal por hora
+            {{ _("Aire del canal por hora") }}
             <span class="muted">({{ cost.transmissions_per_h | num }} tx/h)</span>
           </td>
           {% for p in cost.projections %}<td>{{ p.airtime_pct | pct }}</td>{% endfor %}
         </tr>
         <tr>
-          <td class="muted">Coste vs SF actual</td>
+          <td class="muted">{{ _("Coste vs SF actual") }}</td>
           {% for p in cost.projections %}
           <td class="strong{% if p.factor_vs_current > 1.0 %} flag-warn{% endif %}">{{ p.factor_vs_current | ratio }}</td>
           {% endfor %}
         </tr>
         <tr>
-          <td class="muted">Sensibilidad vs actual</td>
+          <td class="muted">{{ _("Sensibilidad vs actual") }}</td>
           {% for p in cost.projections %}<td>{{ p.sensitivity_db | snr }}</td>{% endfor %}
         </tr>
         <tr>
-          <td class="muted">Margen</td>
+          <td class="muted">{{ _("Margen") }}</td>
           {% for p in cost.projections %}<td>{{ p.margin_db | snr }}</td>{% endfor %}
         </tr>
       </tbody>
@@ -165,9 +154,8 @@
   </div>
   {% else %}
   <p class="stamp">
-    <span class="flag-warn">Sin CR o sin mezcla de tamaños</span> · no se puede modelar
-    el aire de este canal. Hace falta que el receptor publique <code>/status</code> con
-    su configuración y que los paquetes traigan su trama <code>raw</code>.
+    <span class="flag-warn">{{ _("Sin CR o sin mezcla de tamaños") }}</span> ·
+    {{ _("no se puede modelar el aire de este canal. Hace falta que el receptor publique <code>/status</code> con su configuración y que los paquetes traigan su trama <code>raw</code>.") }}
   </p>
   {% endif %}
 </section>
@@ -178,35 +166,29 @@
 
 {% if not comparables %}
 <div class="empty-state">
-  <strong>Hoy no hay nada que comparar</strong>
-  Ningún receptor, pareja ni comarca ha estado en más de un canal en esta ventana.
-  Y es lógico: ahora mismo <strong>todo el mundo escucha en 869.618</strong>.
+  <strong>{{ _("Hoy no hay nada que comparar") }}</strong>
+  {{ _("Ningún receptor, pareja ni comarca ha estado en más de un canal en esta ventana. Y es lógico: ahora mismo <strong>todo el mundo escucha en 869.618</strong>.") }}
   <p style="margin-top:12px;">
-    Lo que hace falta es mucho más barato de lo que parece: <strong>no</strong> hacen
-    falta muchos receptores por canal, basta con <strong>uno que vaya alternando</strong>.
-    Un receptor que pase 24 h en 869.618 y 24 h en 869.450 aporta una comparación
-    limpia de ruido, errores y alcance, porque mantiene antena, ubicación y hardware.
-    Con veinte receptores repartidos por canales distintos no se consigue eso.
+    {{ _("Lo que hace falta es mucho más barato de lo que parece: <strong>no</strong> hacen falta muchos receptores por canal, basta con <strong>uno que vaya alternando</strong>. Un receptor que pase 24 h en 869.618 y 24 h en 869.450 aporta una comparación limpia de ruido, errores y alcance, porque mantiene antena, ubicación y hardware. Con veinte receptores repartidos por canales distintos no se consigue eso.") }}
   </p>
   <p style="margin-top:12px;">
-    <a href="/campana">Ver qué canales no cubre nadie →</a>
+    <a href="/campana">{{ _("Ver qué canales no cubre nadie →") }}</a>
   </p>
 </div>
 {% endif %}
 
 {% if observers %}
-<h2>Por receptor</h2>
+<h2>{{ _("Por receptor") }}</h2>
 <p class="stamp">
-  La comparación más limpia que existe: mismo equipo, misma antena, misma ubicación.
+  {{ _("La comparación más limpia que existe: mismo equipo, misma antena, misma ubicación.") }}
 </p>
 {% for subject in observers %}{{ subject_block(subject) }}{% endfor %}
 {% endif %}
 
 {% if pairs %}
-<h2>Por pareja</h2>
+<h2>{{ _("Por pareja") }}</h2>
 <p class="stamp">
-  Mismo enlace entre dos receptores, medido en cada canal. El PDR sí es comparable
-  directamente.
+  {{ _("Mismo enlace entre dos receptores, medido en cada canal. El PDR sí es comparable directamente.") }}
 </p>
 {% for subject in pairs %}{{ subject_block(subject) }}{% endfor %}
 {% endif %}
@@ -215,19 +197,13 @@
 {% set excluded_regions = regions | rejectattr("comparable") | list %}
 
 {% if comparable_regions or excluded_regions %}
-<h2>Por comarca</h2>
+<h2>{{ _("Por comarca") }}</h2>
 <div class="note warn">
   <p>
-    Compara <strong>el mismo canal</strong> medido por comarcas distintas: misma
-    frecuencia, mismo ancho y mismo SF, así que lo que cambia es el entorno. Al revés
-    —canales distintos dentro de una comarca— se caía en el caso traicionero de «misma
-    frecuencia, distinto SF», donde cada receptor oye a emisores distintos.
+    {{ _("Compara <strong>el mismo canal</strong> medido por comarcas distintas: misma frecuencia, mismo ancho y mismo SF, así que lo que cambia es el entorno. Al revés —canales distintos dentro de una comarca— se caía en el caso traicionero de «misma frecuencia, distinto SF», donde cada receptor oye a emisores distintos.") }}
   </p>
   <p>
-    Aun así <strong>no controla el receptor</strong>: cada comarca tiene el suyo, con
-    su antena y su ubicación. Orienta, no concluye. La columna <em>(ref)</em> es la
-    comarca con más receptores, y las demás llevan su <strong>diferencia</strong>
-    con ella.
+    {{ _("Aun así <strong>no controla el receptor</strong>: cada comarca tiene el suyo, con su antena y su ubicación. Orienta, no concluye. La columna <em>(ref)</em> es la comarca con más receptores, y las demás llevan su <strong>diferencia</strong> con ella.") }}
   </p>
 </div>
 
@@ -235,14 +211,13 @@
 <section class="paired">
   <h3>{{ group.channel_label }}</h3>
   <p class="stamp">
-    Se solapan {{ group.overlap_seconds // 60 }} min · referencia
-    <strong>{{ group.reference }}</strong>
+    {{ _("Se solapan {n} min · referencia <strong>{ref}</strong>", n=(group.overlap_seconds // 60), ref=group.reference) }}
   </p>
   <div class="table-scroll">
     <table>
       <thead>
         <tr>
-          <th>Comparación</th>
+          <th>{{ _("Comparación") }}</th>
           {% for r in group.regions %}
           <th{% if r.is_reference %} class="strong"{% endif %}>{{ r.region }}{% if r.is_reference %} <span class="muted">(ref)</span>{% endif %}</th>
           {% endfor %}
@@ -250,17 +225,17 @@
       </thead>
       <tbody>
         <tr>
-          <td class="muted">Receptores</td>
+          <td class="muted">{{ _("Receptores") }}</td>
           {% for r in group.regions %}<td>{{ r.observers }}</td>{% endfor %}
         </tr>
         <tr>
-          <td class="muted">Medido entre</td>
+          <td class="muted">{{ _("Medido entre") }}</td>
           {% for r in group.regions %}
           <td class="muted">{{ r.first_ts | ts }} – {{ r.last_ts | ts }}</td>
           {% endfor %}
         </tr>
         <tr>
-          <td>Ruido de fondo <span class="muted">· menos es mejor</span></td>
+          <td>{{ _("Ruido de fondo") }} <span class="muted">· {{ _("menos es mejor") }}</span></td>
           {% for r in group.regions %}
           <td>
             {{ r.noise_floor_dbm | db }}
@@ -271,7 +246,7 @@
           {% endfor %}
         </tr>
         <tr>
-          <td>Ocupación <span class="muted">· menos es mejor</span></td>
+          <td>{{ _("Ocupación") }} <span class="muted">· {{ _("menos es mejor") }}</span></td>
           {% for r in group.regions %}
           <td>
             {{ r.chan_util_pct | pct }}
@@ -290,16 +265,14 @@
 {% if excluded_regions %}
 <div class="note">
   <p>
-    <strong>Canales que no se pueden comparar entre comarcas</strong> en esta ventana:
+    {{ _("<strong>Canales que no se pueden comparar entre comarcas</strong> en esta ventana:") }}
     {% for group in excluded_regions %}
     <strong>{{ group.channel_label }}</strong>
-    ({% if group.regions | length < 2 %}solo {{ group.regions[0].region }}{% else %}sin
-    solapamiento temporal{% endif %}){% if not loop.last %} · {% endif %}
+    ({% if group.regions | length < 2 %}{{ _("solo") }} {{ group.regions[0].region }}{% else %}{{ _("sin solapamiento temporal") }}{% endif %}){% if not loop.last %} · {% endif %}
     {% endfor %}.
   </p>
   <p>
-    Hace falta que <strong>dos comarcas midan el mismo canal</strong> y que coincidan
-    en el tiempo; si el segundo canal existió fuera de la ventana, amplíala para verlo.
+    {{ _("Hace falta que <strong>dos comarcas midan el mismo canal</strong> y que coincidan en el tiempo; si el segundo canal existió fuera de la ventana, amplíala para verlo.") }}
   </p>
 </div>
 {% endif %}
