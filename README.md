@@ -382,6 +382,46 @@ casos: está parametrizado con `CATMESH_SITE` y `CATMESH_UPSTREAM`.
 > los servicios con perfil quedan fuera de su vista. Hay que pararlo con el mismo
 > perfil: `docker compose --profile tls down`.
 
+### Publicarlo sin abrir puertos (Cloudflare Tunnel)
+
+Para un servidor doméstico detrás de un router, o con CGNAT. **No hace falta Caddy**:
+el TLS lo pone la red de Cloudflare.
+
+1. Añade tu dominio a Cloudflare (plan gratis) y cambia los *nameservers* en tu
+   registrador. Hasta que propague, el túnel no tendrá a qué apuntar.
+2. En el panel: **Zero Trust → Networks → Tunnels → Create a tunnel**, tipo
+   *Cloudflared*, y copia el **token**.
+3. En el túnel, añade un **public hostname**:
+
+   | Campo | Valor |
+   | ----- | ----- |
+   | Subdomain | `observatorio` |
+   | Domain | `tudominio.cat` |
+   | Service | `http://web:8000` |
+
+   Tiene que ser `web:8000`, **no** `localhost:8000`: `web` es el nombre del servicio
+   dentro de la red de Docker, que es donde vive también `cloudflared`.
+
+4. En `.env`:
+
+   ```ini
+   CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi...
+   ```
+
+5. Arrancarlo:
+
+   ```bash
+   docker compose --profile tunnel up -d
+   docker compose logs cloudflared | tail -5
+   ```
+
+El puerto publicado en el anfitrión no cambia: sigue sirviendo para la LAN y la VPN.
+
+**La aplicación no tiene autenticación**, así que con el túnel activo cualquiera que
+sepa la dirección ve todas las dades. Para un observatorio de datos comunitarios es lo
+que se quiere, pero si algún día hiciera falta restringirlo, **Cloudflare Access** pone
+una lista de correos autorizados delante del mismo hostname, sin tocar la aplicación.
+
 ### Llevarse el historial acumulado
 
 La base de datos es un fichero, así que se copia al volumen y no se pierde nada:
