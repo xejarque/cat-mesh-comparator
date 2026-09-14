@@ -91,22 +91,28 @@ def init_db(conn: sqlite3.Connection) -> None:
     with transaction(conn):
         for preset in SEED_PRESETS:
             ensure_preset(conn, preset)
-        _refresh_seed_labels(conn)
+        _refresh_preset_labels(conn)
 
 
-def _refresh_seed_labels(conn: sqlite3.Connection) -> None:
-    """Vuelve a poner al día las etiquetas de los presets conocidos.
+def _refresh_preset_labels(conn: sqlite3.Connection) -> None:
+    """Vuelve a poner al día las etiquetas de **todos** los presets.
 
     Se guardan desnormalizadas para que la base se explique sola al abrirla con
-    sqlite3, pero la web siempre las recalcula con `preset_label`. Si cambia el
-    formato de la etiqueta, las filas que ya existían se quedarían con el texto
-    antiguo — que es exactamente lo que pasó cuando la etiqueta pasó a llevar
-    siempre los parámetros. Se hace aquí, una vez al arrancar, y no en cada paquete.
+    sqlite3, pero la web siempre las recalcula con `preset_label`. Si cambia la regla
+    de nombrado, las filas que ya existían se quedarían con el texto viejo. Se hace
+    aquí, una vez al arrancar, y no en cada paquete: al ser un `UPDATE` con `WHERE`,
+    las que ya están bien no se tocan.
     """
-    for preset in SEED_PRESETS:
+    rows = conn.execute(
+        "SELECT preset_id, freq_mhz, bw_khz, sf, cr FROM presets"
+    ).fetchall()
+    for row in rows:
+        label = preset_label(
+            PresetKey(row["freq_mhz"], row["bw_khz"], row["sf"], row["cr"])
+        )
         conn.execute(
             "UPDATE presets SET label = ? WHERE preset_id = ? AND label IS NOT ?",
-            (preset_label(preset), preset.db_id, preset_label(preset)),
+            (label, row["preset_id"], label),
         )
 
 

@@ -438,8 +438,9 @@ def test_channel_catalog_lists_channels_and_watchers(conn):
     catalog = channel_catalog(conn)
 
     # Salen TODOS los canales conocidos, también los que no tiene nadie: ver los
-    # huecos es justo el objetivo de la página de campaña.
-    assert len(catalog) == len(SEED_PRESETS)
+    # huecos es justo el objetivo de la página de campaña. Y además los que se hayan
+    # descubierto desde los datos, que no están sembrados.
+    assert len(catalog) >= len(SEED_PRESETS)
     con_observers = [entry for entry in catalog if entry["observers"]]
     assert len(con_observers) == 2
     assert {entry["cr"] for entry in con_observers} == {6, 8}

@@ -5,7 +5,7 @@ import pytest
 from app.db import connect, ensure_preset, init_db, insert_packets, insert_status
 from app.db import SCHEMA_VERSION, prune_raw_packets
 from app.models import PresetKey
-from app.presets import SEED_PRESETS, preset_label
+from app.presets import SEED_PRESETS, preset_label, preset_name
 from tests.helpers import attribute, epoch, mk_packet, mk_status
 
 SLOT1 = PresetKey(869.431, 62.5, 11, 5)
@@ -37,17 +37,42 @@ def test_preset_label_always_carries_the_parameters():
 
     Regresión: los alias se escribían a mano y unos llevaban SF/CR y otros no, así
     que dos filas de la misma tabla se leían con criterios distintos y no se podían
-    comparar. En 869.618 conviven tres configuraciones, y el nombre no las distingue.
+    comparar.
     """
     for preset in SEED_PRESETS:
-        assert preset_label(preset) == (
-            f"{SEED_PRESETS[preset]} · {preset.freq_mhz:g} MHz"
-            f" · BW{preset.bw_khz:g} · SF{preset.sf} · CR4/{preset.cr}"
-        )
+        label = preset_label(preset)
+        assert f"{preset.freq_mhz:g} MHz" in label
+        assert f"BW{preset.bw_khz:g}" in label
+        assert f"SF{preset.sf}" in label
+        assert f"CR4/{preset.cr}" in label
+
+
+def test_slot_name_comes_from_the_frequency_not_from_a_list():
+    """Cualquier configuración sobre 869.618 es el slot 4, la haya catalogado alguien
+    o no.
+
+    Regresión: el nombre salía de una lista por tupla exacta, así que un SF10 recién
+    descubierto aparecía sin slot en la misma tabla donde los demás sí lo llevaban.
+    """
+    recien_visto = PresetKey(869.618, 62.5, 10, 8)
+
+    assert preset_name(recien_visto) == "Slot 4"
+    assert preset_label(recien_visto).startswith("Slot 4 · ")
+
+
+def test_a_wide_preset_on_a_slot_frequency_is_not_a_slot():
+    # El slot es esa frecuencia **con BW 62.5**; en 250 kHz es otra cosa.
+    assert preset_name(PresetKey(869.618, 250.0, 11, 5)) is None
+
+
+def test_non_slot_presets_use_their_alias():
+    assert preset_name(PresetKey(869.525, 250.0, 11, 5)) == "LongFast"
+    assert preset_name(PresetKey(869.450, 62.5, 7, 6)) == "Propuesto · guarda inferior"
 
 
 def test_a_new_preset_without_alias_is_labelled_with_its_parameters(conn):
     preset = PresetKey(869.700, 125.0, 9, 8)
+    assert preset_name(preset) is None
     assert preset_label(preset) == "869.7 MHz · BW125 · SF9 · CR4/8"
 
 

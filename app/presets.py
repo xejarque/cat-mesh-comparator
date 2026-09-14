@@ -2,24 +2,24 @@ from __future__ import annotations
 
 from app.models import PresetKey
 
-# Nombres de los presets conocidos. Los presets se descubren solos desde los datos
-# (cualquier tupla nueva en un /status crea su fila); esto solo pone **alias** a los
-# que ya hemos identificado.
+# Presets que se crean al arrancar aunque nadie los use todavía, para que la página de
+# campaña pueda enseñar los huecos.
+SEED_PRESETS: tuple[PresetKey, ...] = (
+    PresetKey(869.432, 62.5, 7, 6),
+    PresetKey(869.493, 62.5, 7, 6),
+    PresetKey(869.556, 62.5, 7, 6),
+    PresetKey(869.618, 62.5, 7, 6),
+    PresetKey(869.450, 62.5, 7, 6),
+    PresetKey(869.600, 62.5, 7, 6),
+    PresetKey(869.525, 250.0, 11, 5),
+)
+
+# Nombre para los presets que **no** son uno de los cuatro slots.
 #
-# Aquí va solo el nombre, nunca los parámetros: los añade `preset_label` desde la
-# tupla. Antes se escribían a mano y unos llevaban SF/CR y otros no, así que dos
-# filas de la misma tabla se leían con criterios distintos y no se podían comparar.
-#
-# Los cuatro slots de h1.4 van con los parámetros que usa de verdad la red de
-# Cataluña — BW 62.5 kHz, SF7, CR 4/6 — observados en el broker el 2026-09-14.
-# No son los SF11/CR5 que se ven en otras redes europeas.
-SEED_PRESETS: dict[PresetKey, str] = {
-    PresetKey(869.432, 62.5, 7, 6): "Slot 1",
-    PresetKey(869.493, 62.5, 7, 6): "Slot 2",
-    PresetKey(869.556, 62.5, 7, 6): "Slot 3",
-    PresetKey(869.618, 62.5, 7, 6): "Slot 4",
-    PresetKey(869.618, 62.5, 8, 8): "Slot 4",
-    PresetKey(869.618, 62.5, 7, 8): "Slot 4",
+# El nombre de un slot lo determina su frecuencia, no esta lista: si no, cualquier
+# combinación nueva de SF/CR sobre 869.618 se quedaría sin nombre, que es justo lo que
+# pasaba con SF10. Aquí van solo los que no son slots.
+PRESET_ALIASES: dict[PresetKey, str] = {
     PresetKey(869.450, 62.5, 7, 6): "Propuesto · guarda inferior",
     PresetKey(869.600, 62.5, 7, 6): "Propuesto · guarda superior",
     PresetKey(869.525, 250.0, 11, 5): "LongFast",
@@ -33,14 +33,28 @@ def preset_parameters(preset: PresetKey) -> str:
     )
 
 
+def preset_name(preset: PresetKey) -> str | None:
+    """Nombre del preset, si tiene uno.
+
+    Los cuatro slots de h1.4 se nombran por su **frecuencia**: cualquier combinación
+    de SF y CR sobre 869.618 es el slot 4, aunque nadie la haya catalogado antes. Es
+    lo que hace que un preset recién descubierto no aparezca distinto de los demás.
+    """
+    if abs(preset.bw_khz - 62.5) < 0.01:
+        index = slot_index(preset.freq_mhz)
+        if index is not None:
+            return f"Slot {index}"
+    return PRESET_ALIASES.get(preset)
+
+
 def preset_label(preset: PresetKey) -> str:
     """Nombre del preset, si lo tiene, seguido **siempre** de sus parámetros.
 
     La etiqueta tiene que describirse sola: sin frecuencia y sin SF/CR no se puede
-    comparar nada leyendo. En 869.618 conviven tres configuraciones distintas, así
+    comparar nada leyendo. En 869.618 conviven cuatro configuraciones distintas, así
     que el nombre por sí solo no basta para distinguirlas.
     """
-    name = SEED_PRESETS.get(preset)
+    name = preset_name(preset)
     parameters = preset_parameters(preset)
     return f"{name} · {parameters}" if name else parameters
 
